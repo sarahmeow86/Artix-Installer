@@ -188,7 +188,6 @@ for script in zfs-live.sh zfs-setup.sh inst_var.sh disksetup.sh installpkgs.sh \
     source "./scripts/$script" || error "Failed to source $script"
 done
 
-trap 'error "Installation interrupted"' INT TERM
 
 # Main installation process
 perform_installation() {
@@ -244,6 +243,7 @@ perform_installation() {
     save_logs
     cleanup_mounts
 }
+trap 'error "Installation interrupted"' INT TERM
 
 # Replace the existing installation code with:
 perform_installation
