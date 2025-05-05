@@ -194,41 +194,59 @@ done
 trap 'error "Installation interrupted"' INT TERM
 
 # Main installation process
-debug $DEBUG_INFO "Starting main installation process"
+perform_installation() {
+    debug $DEBUG_INFO "Starting main installation process"
 
-# ...existing installation steps with debug logging...
-choose_filesystem
-debug $DEBUG_INFO "Selected filesystem: $FILESYSTEM"
+    # Select and configure filesystem
+    choose_filesystem || error "Error selecting filesystem"
+    debug $DEBUG_INFO "Selected filesystem: $FILESYSTEM"
 
-debug $DEBUG_INFO "Installing Chaotic AUR"
-chaoticaur || error "Error installing Chaotic AUR!"
-debug $DEBUG_INFO "Adding repositories"
-addrepo || error "Error adding repos!"
+    # Configure repositories
+    debug $DEBUG_INFO "Installing Chaotic AUR"
+    chaoticaur || error "Error installing Chaotic AUR!"
+    debug $DEBUG_INFO "Adding repositories"
+    addrepo || error "Error adding repos!"
 
-if [[ $FILESYSTEM == "zfs" ]]; then
-    debug $DEBUG_INFO "Installing ZFS support"
-    installzfs || error "Error installing ZFS!"
-fi
+    # Install ZFS if selected
+    if [[ $FILESYSTEM == "zfs" ]]; then
+        debug $DEBUG_INFO "Installing ZFS support"
+        installzfs || error "Error installing ZFS!"
+    fi
 
-# Installation variables
-debug $DEBUG_INFO "Configuring installation variables"
-for step in installtz installhost installkrn selectdisk; do
-    debug $DEBUG_DEBUG "Executing: $step"
-    $step || error "Error in $step"
-done
+    # Configure installation variables
+    debug $DEBUG_INFO "Configuring installation variables"
+    local var_steps=("installtz" "installhost" "installkrn" "selectdisk")
+    for step in "${var_steps[@]}"; do
+        debug $DEBUG_DEBUG "Executing: $step"
+        $step || error "Error in $step"
+    done
 
-# System setup
-debug $DEBUG_INFO "Setting up system"
-for step in partdrive setup_filesystem efiswap installpkgs fstab configure_initramfs \
-           finishtouch prepare_chroot; do
-    debug $DEBUG_DEBUG "Executing: $step"
-    $step || error "Error in $step"
-done
+    # Set up system
+    debug $DEBUG_INFO "Setting up system"
+    local setup_steps=(
+        "partdrive"
+        "setup_filesystem"
+        "efiswap"
+        "installpkgs"
+        "fstab"
+        "configure_initramfs"
+        "finishtouch"
+        "prepare_chroot"
+    )
+    for step in "${setup_steps[@]}"; do
+        debug $DEBUG_DEBUG "Executing: $step"
+        $step || error "Error in $step"
+    done
 
-# Finalize installation
-run_chroot
+    # Finalize installation
+    run_chroot
 
-debug $DEBUG_INFO "Installation completed successfully"
-printf "%s\n" "${bold}Installation completed successfully!"
-save_logs
-cleanup_mounts
+    # Cleanup and finish
+    debug $DEBUG_INFO "Installation completed successfully"
+    printf "%s\n" "${bold}Installation completed successfully!"
+    save_logs
+    cleanup_mounts
+}
+
+# Replace the existing installation code with:
+perform_installation
