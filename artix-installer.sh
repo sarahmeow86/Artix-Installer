@@ -11,6 +11,8 @@ DEBUG_LEVEL=${DEBUG_LEVEL:-$DEBUG_INFO}
 bold=$(tput setaf 2 bold)
 bolderror=$(tput setaf 3 bold)
 normal=$(tput sgr0)
+INST_MNT=$(mktemp -d)
+INST_UUID=$(dd if=/dev/urandom of=/dev/stdout bs=1 count=100 2>/dev/null | tr -dc 'a-z0-9' | cut -c-6)
 
 # Create log directory and file
 mkdir -p /var/log/artix-installer
@@ -177,11 +179,6 @@ fi
 # Initialize installation
 debug $DEBUG_INFO "Initializing installation environment"
 check_swap || error "Error handling swap partitions!"
-
-INST_MNT=$(mktemp -d)
-debug $DEBUG_DEBUG "Created temporary mount point: $INST_MNT"
-INST_UUID=$(dd if=/dev/urandom of=/dev/stdout bs=1 count=100 2>/dev/null | tr -dc 'a-z0-9' | cut -c-6)
-debug $DEBUG_DEBUG "Generated installation UUID: $INST_UUID"
 
 # Source required scripts
 debug $DEBUG_INFO "Sourcing installation scripts"
