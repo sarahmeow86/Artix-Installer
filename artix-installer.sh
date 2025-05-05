@@ -1,0 +1,234 @@
+#!/usr/bin/env bash
+# Debug levels
+DEBUG_OFF=0
+DEBUG_ERROR=1
+DEBUG_WARN=2
+DEBUG_INFO=3
+DEBUG_DEBUG=4
+
+# Default debug level and colors
+DEBUG_LEVEL=${DEBUG_LEVEL:-$DEBUG_INFO}
+bold=$(tput setaf 2 bold)
+bolderror=$(tput setaf 3 bold)
+normal=$(tput sgr0)
+
+# Create log directory and file
+mkdir -p /var/log/artix-installer
+LOG_FILE="/var/log/artix-installer/install-$(date +%Y%m%d-%H%M%S).log"
+
+# Debug function
+debug() {
+    local level=$1
+    shift
+    local message="$@"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+
+    if [[ $level -le $DEBUG_LEVEL ]]; then
+        case $level in
+            $DEBUG_ERROR)
+                echo "[ERROR] [$timestamp] $message" >> "$LOG_FILE"
+                ;;
+            $DEBUG_WARN)
+                echo "[WARN]  [$timestamp] $message" >> "$LOG_FILE"
+                ;;
+            $DEBUG_INFO)
+                echo "[INFO]  [$timestamp] $message" >> "$LOG_FILE"
+                ;;
+            $DEBUG_DEBUG)
+                echo "[DEBUG] [$timestamp] $message" >> "$LOG_FILE"
+                ;;
+        esac
+    fi
+}
+
+# Error handling with debug
+cleanup_on_error() {
+    debug $DEBUG_WARN "Error occurred, starting cleanup"
+    save_logs
+    cleanup_mounts
+    debug $DEBUG_INFO "Cleanup completed after error"
+    exit 1
+}
+
+# Modify the existing error() function
+error() {
+    debug $DEBUG_ERROR "$1"
+    printf "%s\n" "${bolderror}ERROR:${normal}\\n%s\\n" "$1" >&2
+    
+    # Check if mounting has started
+    if [[ -d "$INST_MNT" ]] || [[ $FILESYSTEM == "zfs" && $(zpool list "rpool_$INST_UUID" 2>/dev/null) ]]; then
+        cleanup_on_error
+    else
+        exit 1
+    fi
+}
+
+save_logs() {
+    debug $DEBUG_INFO "Saving installation logs"
+    
+    # Create logs directory in script location
+    local log_dir="$(dirname "$(realpath "$0")")/logs"
+    mkdir -p "$log_dir" || {
+        debug $DEBUG_ERROR "Failed to create logs directory"
+        error "Failed to create: $log_dir"
+    }
+
+    # Copy main installation log
+    debug $DEBUG_DEBUG "Copying main installation log"
+    cp "$LOG_FILE" "$log_dir/" || {
+        debug $DEBUG_ERROR "Failed to copy main install log"
+        error "Failed to copy: $LOG_FILE"
+    }
+
+    # Copy chroot log if it exists
+    if [[ -f "$CHROOT_LOG" ]]; then
+        debug $DEBUG_DEBUG "Copying chroot log"
+        cp "$CHROOT_LOG" "$log_dir/" || {
+            debug $DEBUG_ERROR "Failed to copy chroot log"
+            error "Failed to copy: $CHROOT_LOG"
+        }
+    fi
+
+    debug $DEBUG_INFO "Installation logs saved to: $log_dir"
+}
+
+cleanup_mounts() {
+    debug $DEBUG_INFO "Starting cleanup process"
+
+    # Remove /install directory from INST_MNT first
+    if [[ -d "$INST_MNT/install" ]]; then
+        debug $DEBUG_DEBUG "Removing /install directory from mount point"
+        rm -rf "$INST_MNT/install" || {
+            debug $DEBUG_ERROR "Failed to remove install directory"
+            error "Failed to remove: $INST_MNT/install"
+        }
+    fi    
+
+    # Then unmount everything under INST_MNT
+    if mountpoint -q "$INST_MNT"; then
+        debug $DEBUG_DEBUG "Force unmounting all filesystems under: $INST_MNT"
+        umount -Rl "$INST_MNT" || {
+            debug $DEBUG_ERROR "Failed to unmount: $INST_MNT"
+            error "Failed to unmount installation directory"
+        }
+    fi
+
+    # Export ZFS pool if it exists
+    if [[ $FILESYSTEM == "zfs" ]]; then
+        debug $DEBUG_DEBUG "Checking for ZFS pool: rpool_$INST_UUID"
+        if zpool list "rpool_$INST_UUID" &>/dev/null; then
+            debug $DEBUG_INFO "Exporting ZFS pool: rpool_$INST_UUID"
+            zpool export "rpool_$INST_UUID" || {
+                debug $DEBUG_ERROR "Failed to export ZFS pool"
+                error "Failed to export ZFS pool: rpool_$INST_UUID"
+            }
+        fi
+    fi
+
+    # Finally remove the mount point
+    if [[ -d "$INST_MNT" ]]; then
+        debug $DEBUG_DEBUG "Removing mount point directory"
+        rm -rf "$INST_MNT" || {
+            debug $DEBUG_ERROR "Failed to remove mount point"
+            error "Failed to remove: $INST_MNT"
+        }
+    fi
+
+    debug $DEBUG_INFO "Cleanup completed successfully"
+}
+
+check_swap() {
+    debug $DEBUG_INFO "Checking for active swap partitions"
+    local active_swaps=($(swapon --show=NAME --noheadings))
+    
+    if [[ ${#active_swaps[@]} -gt 0 ]]; then
+        debug $DEBUG_INFO "Found active swap partitions: ${active_swaps[*]}"
+        dialog --infobox "Deactivating active swap partitions..." 5 50
+        for swap in "${active_swaps[@]}"; do
+            debug $DEBUG_DEBUG "Deactivating swap: $swap"
+            swapoff "$swap" || error "Failed to deactivate swap partition: $swap"
+        done
+        debug $DEBUG_INFO "All swap partitions deactivated"
+    else
+        debug $DEBUG_DEBUG "No active swap partitions found"
+    fi
+}
+
+# Check for dialog
+debug $DEBUG_INFO "Checking for required packages"
+if ! command -v dialog &> /dev/null; then
+    debug $DEBUG_WARN "dialog not found, attempting installation"
+    pacman -Sy --noconfirm dialog gptfdisk || {
+        debug $DEBUG_ERROR "Failed to install required packages"
+        error "Failed to install dialog. Please install it manually."
+    }
+fi
+
+# Check root privileges
+debug $DEBUG_INFO "Checking root privileges"
+if [[ $EUID -ne 0 ]]; then
+    debug $DEBUG_ERROR "Script not running as root"
+    dialog --title "Permission Denied" --msgbox "\
+${bolderror}ERROR:${normal} This script must be run as root.\n\n\
+Please run it with sudo or as the root user." 10 50
+    exit 1
+fi
+
+# Initialize installation
+debug $DEBUG_INFO "Initializing installation environment"
+check_swap || error "Error handling swap partitions!"
+
+INST_MNT=$(mktemp -d)
+debug $DEBUG_DEBUG "Created temporary mount point: $INST_MNT"
+INST_UUID=$(dd if=/dev/urandom of=/dev/stdout bs=1 count=100 2>/dev/null | tr -dc 'a-z0-9' | cut -c-6)
+debug $DEBUG_DEBUG "Generated installation UUID: $INST_UUID"
+
+# Source required scripts
+debug $DEBUG_INFO "Sourcing installation scripts"
+for script in zfs-live.sh zfs-setup.sh inst_var.sh disksetup.sh installpkgs.sh \
+             configuration.sh filesystem.sh efi.sh repoconfig.sh ; do
+    debug $DEBUG_DEBUG "Sourcing: $script"
+    source "./scripts/$script" || error "Failed to source $script"
+done
+
+trap 'error "Installation interrupted"' INT TERM
+
+# Main installation process
+debug $DEBUG_INFO "Starting main installation process"
+
+# ...existing installation steps with debug logging...
+choose_filesystem
+debug $DEBUG_INFO "Selected filesystem: $FILESYSTEM"
+
+debug $DEBUG_INFO "Installing Chaotic AUR"
+chaoticaur || error "Error installing Chaotic AUR!"
+debug $DEBUG_INFO "Adding repositories"
+addrepo || error "Error adding repos!"
+
+if [[ $FILESYSTEM == "zfs" ]]; then
+    debug $DEBUG_INFO "Installing ZFS support"
+    installzfs || error "Error installing ZFS!"
+fi
+
+# Installation variables
+debug $DEBUG_INFO "Configuring installation variables"
+for step in installtz installhost installkrn selectdisk; do
+    debug $DEBUG_DEBUG "Executing: $step"
+    $step || error "Error in $step"
+done
+
+# System setup
+debug $DEBUG_INFO "Setting up system"
+for step in partdrive setup_filesystem efiswap installpkgs fstab configure_initramfs \
+           finishtouch prepare_chroot; do
+    debug $DEBUG_DEBUG "Executing: $step"
+    $step || error "Error in $step"
+done
+
+# Finalize installation
+run_chroot
+
+debug $DEBUG_INFO "Installation completed successfully"
+printf "%s\n" "${bold}Installation completed successfully!"
+save_logs
+cleanup_mounts

@@ -1,0 +1,11 @@
+Runlevel: default
+ dbus                                                  
+ NetworkManager                         
+ netmount                                        
+ local                                                   
+ agetty.tty3                                      
+ agetty.tty4                                      
+ agetty.tty1                                      
+ agetty.tty6                                      
+ agetty.tty2                                      
+ agetty.tty5                                      

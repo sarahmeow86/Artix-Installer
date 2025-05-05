@@ -1,0 +1,16 @@
+ metalog
+ acpid
+ dbus
+ connmand
+ bluetoothd
+ cronie
+ cupsd
+ netmount
+ lightdm
+ local
+ agetty.tty3
+ agetty.tty6
+ agetty.tty1
+ agetty.tty2
+ agetty.tty4
+ agetty.tty5
