@@ -243,6 +243,8 @@ perform_installation() {
     save_logs
     cleanup_mounts
 }
+
+# Set up error handling
 trap 'error "Installation interrupted"' INT TERM
 
 # Replace the existing installation code with:
