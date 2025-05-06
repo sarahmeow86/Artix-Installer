@@ -12,7 +12,9 @@ bold=$(tput setaf 2 bold)
 bolderror=$(tput setaf 3 bold)
 normal=$(tput sgr0)
 INST_MNT=$(mktemp -d)
-INST_UUID=$(dd if=/dev/urandom of=/dev/stdout bs=1 count=100 2>/dev/null | tr -dc 'a-z0-9' | cut -c-6)
+# Only generate UUID if no pool name is provided
+INST_UUID=""
+ZFS_POOL_NAME=""
 
 # Create log directory and file
 mkdir -p /var/log/artix-installer
@@ -58,7 +60,7 @@ error() {
     printf "%s\n" "${bolderror}ERROR:${normal}\\n%s\\n" "$1" >&2
     
     # Check if mounting has started
-    if [[ -d "$INST_MNT" ]] || [[ $FILESYSTEM == "zfs" && $(zpool list "rpool_$INST_UUID" 2>/dev/null) ]]; then
+    if [[ -d "$INST_MNT" ]] || [[ $FILESYSTEM == "zfs" && $(zpool list "$ZFS_POOL_NAME" 2>/dev/null) ]]; then
         cleanup_on_error
     else
         exit 1
@@ -104,7 +106,7 @@ cleanup_mounts() {
             debug $DEBUG_ERROR "Failed to remove install directory"
             error "Failed to remove: $INST_MNT/install"
         }
-    fi    
+    }    
 
     # Then unmount everything under INST_MNT
     if mountpoint -q "$INST_MNT"; then
@@ -117,12 +119,12 @@ cleanup_mounts() {
 
     # Export ZFS pool if it exists
     if [[ $FILESYSTEM == "zfs" ]]; then
-        debug $DEBUG_DEBUG "Checking for ZFS pool: rpool_$INST_UUID"
-        if zpool list "rpool_$INST_UUID" &>/dev/null; then
-            debug $DEBUG_INFO "Exporting ZFS pool: rpool_$INST_UUID"
-            zpool export "rpool_$INST_UUID" || {
+        debug $DEBUG_DEBUG "Checking for ZFS pool: $ZFS_POOL_NAME"
+        if zpool list "$ZFS_POOL_NAME" &>/dev/null; then
+            debug $DEBUG_INFO "Exporting ZFS pool: $ZFS_POOL_NAME"
+            zpool export "$ZFS_POOL_NAME" || {
                 debug $DEBUG_ERROR "Failed to export ZFS pool"
-                error "Failed to export ZFS pool: rpool_$INST_UUID"
+                error "Failed to export ZFS pool: $ZFS_POOL_NAME"
             }
         fi
     fi
@@ -188,6 +190,56 @@ for script in zfs-live.sh zfs-setup.sh inst_var.sh disksetup.sh installpkgs.sh \
     source "./scripts/$script" || error "Failed to source $script"
 done
 
+# Parse command line arguments
+VERSION="1.0.0"
+
+validate_filesystem() {
+    # Add your filesystem validation logic here
+    return 0
+}
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -v|--version)
+            echo "Artix Installer version $VERSION"
+            exit 0
+            ;;
+        -f|--filesystem)
+            if [[ -n "$2" ]]; then
+                if validate_filesystem "$2"; then
+                    FILESYSTEM="$2"
+                else
+                    error "Invalid filesystem: $2. Valid options are: ${VALID_FILESYSTEMS[*]}"
+                fi
+                shift 2
+            else
+                error "Filesystem argument required"
+            fi
+            ;;
+        -p|--pool-name)
+            if [[ -n "$2" ]]; then
+                ZFS_POOL_NAME="$2"
+                FILESYSTEM="zfs"  # Force ZFS filesystem when pool name is provided
+                shift 2
+            else
+                error "Pool name argument required"
+            fi
+            ;;
+        *)
+            error "Unknown option: $1"
+            ;;
+    esac
+done
+
+# Set pool name or generate UUID if using ZFS
+if [[ $FILESYSTEM == "zfs" ]]; then
+    if [[ -n "$ZFS_POOL_NAME" ]]; then
+        INST_UUID="" # Clear UUID when using custom pool name
+    else
+        INST_UUID=$(dd if=/dev/urandom of=/dev/stdout bs=1 count=100 2>/dev/null | tr -dc 'a-z0-9' | cut -c-6)
+        ZFS_POOL_NAME="rpool_$INST_UUID"
+    fi
+fi
 
 # Main installation process
 perform_installation() {

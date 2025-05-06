@@ -7,6 +7,7 @@ rootpool() {
 
     debug $DEBUG_DEBUG "Using disk: $DISK"
     debug $DEBUG_DEBUG "Creating ZFS root pool on: ${DISK}-part2"
+    debug $DEBUG_DEBUG "Using pool name: $ZFS_POOL_NAME"
 
     # Start the progress bar
     (
@@ -15,7 +16,7 @@ rootpool() {
         debug $DEBUG_DEBUG "Running zpool create command"
         zpool create -f -o ashift=12 -O acltype=posixacl -O canmount=off -O compression=zstd \
             -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa \
-            -O mountpoint=/ -R $INST_MNT rpool_$INST_UUID /dev/disk/by-id/$disk-part2 >> "$LOG_FILE" 2>&1 && echo "50"
+            -O mountpoint=/ -R $INST_MNT "$ZFS_POOL_NAME" /dev/disk/by-id/$disk-part2 >> "$LOG_FILE" 2>&1 && echo "50"
         
         debug $DEBUG_DEBUG "ZFS pool creation completed"
         sleep 1
@@ -24,7 +25,7 @@ rootpool() {
     ) | dialog --gauge "Setting up the ZFS root pool..." 10 70 0
 
     # Check if the pool was created successfully
-    if ! zpool status rpool_$INST_UUID >> "$LOG_FILE" 2>&1; then
+    if ! zpool status "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1; then
         debug $DEBUG_ERROR "Failed to create ZFS root pool"
         error "Error setting up the root pool!"
     fi
@@ -42,21 +43,21 @@ createdatasets() {
         echo "10"; sleep 1
         echo "Creating ROOT dataset..."; sleep 1
         debug $DEBUG_DEBUG "Creating ROOT dataset structure"
-        zfs create -o mountpoint=none rpool_$INST_UUID/ROOT >> "$LOG_FILE" 2>&1 && echo "30"
+        zfs create -o mountpoint=none "$ZFS_POOL_NAME/ROOT" >> "$LOG_FILE" 2>&1 && echo "30"
         
         echo "Creating root filesystem..."; sleep 1
         debug $DEBUG_DEBUG "Creating root filesystem dataset"
-        zfs create -o mountpoint=/ -o canmount=noauto rpool_$INST_UUID/ROOT/default >> "$LOG_FILE" 2>&1 && echo "60"
+        zfs create -o mountpoint=/ -o canmount=noauto "$ZFS_POOL_NAME/ROOT/default" >> "$LOG_FILE" 2>&1 && echo "60"
         
         echo "Creating home dataset..."; sleep 1
         debug $DEBUG_DEBUG "Creating home dataset"
-        zfs create -o mountpoint=/home rpool_$INST_UUID/home >> "$LOG_FILE" 2>&1 && echo "100"
+        zfs create -o mountpoint=/home "$ZFS_POOL_NAME/home" >> "$LOG_FILE" 2>&1 && echo "100"
     ) | dialog --gauge "Creating ZFS datasets..." 10 70 0
 
     # Verify datasets
     debug $DEBUG_DEBUG "Verifying created datasets"
-    if ! zfs list rpool_$INST_UUID/ROOT/default >> "$LOG_FILE" 2>&1 || 
-       ! zfs list rpool_$INST_UUID/home >> "$LOG_FILE" 2>&1; then
+    if ! zfs list "$ZFS_POOL_NAME/ROOT/default" >> "$LOG_FILE" 2>&1 || 
+       ! zfs list "$ZFS_POOL_NAME/home" >> "$LOG_FILE" 2>&1; then
         debug $DEBUG_ERROR "Failed to create ZFS datasets"
         error "Error creating the datasets!"
     fi
@@ -74,17 +75,17 @@ mountall() {
         echo "10"; sleep 1
         echo "Mounting root dataset..."; sleep 1
         debug $DEBUG_DEBUG "Mounting root dataset"
-        zfs mount rpool_$INST_UUID/ROOT/default >> "$LOG_FILE" 2>&1 && echo "50"
+        zfs mount "$ZFS_POOL_NAME/ROOT/default" >> "$LOG_FILE" 2>&1 && echo "50"
         
         echo "Mounting home dataset..."; sleep 1
         debug $DEBUG_DEBUG "Mounting home dataset"
-        zfs mount rpool_$INST_UUID/home >> "$LOG_FILE" 2>&1 && echo "100"
+        zfs mount "$ZFS_POOL_NAME/home" >> "$LOG_FILE" 2>&1 && echo "100"
     ) | dialog --gauge "Mounting ZFS datasets..." 10 70 0
 
     # Verify mounts
     debug $DEBUG_DEBUG "Verifying dataset mounts"
-    if ! zfs mount | grep -q "rpool_$INST_UUID/ROOT/default" || 
-       ! zfs mount | grep -q "rpool_$INST_UUID/home"; then
+    if ! zfs mount | grep -q "$ZFS_POOL_NAME/ROOT/default" || 
+       ! zfs mount | grep -q "$ZFS_POOL_NAME/home"; then
         debug $DEBUG_ERROR "Failed to mount ZFS datasets"
         error "Error mounting datasets!"
     fi

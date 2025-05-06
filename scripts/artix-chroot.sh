@@ -194,7 +194,7 @@ install_zfsbootmenu() {
         efibootmgr --disk $(findmnt -n -o SOURCE /boot/efi | sed 's/[0-9]*$//') --part 1 \
             --create --label "ZFSBootMenu" \
             --loader '\EFI\BOOT\BOOTX64.EFI' \
-            --unicode "spl_hostid=$(hostid) zbm.timeout=3 zbm.prefer=zroot zbm.import_policy=hostid" \
+            --unicode "spl_hostid=$(hostid) zbm.timeout=3 zbm.prefer=$ZFS_POOL_NAME zbm.import_policy=hostid" \
             --verbose >> "$CHROOT_LOG" 2>&1 && echo "100" >&3
     ) | dialog --gauge "Installing ZFSBootMenu..." 10 70 0 >&3
 
@@ -261,16 +261,18 @@ cachefile() {
         echo "10" >&3; sleep 1
         debug $DEBUG_DEBUG "Setting ZFS cachefile location"
         echo "Setting ZFS cachefile..." >&3; sleep 1
-        zpool set cachefile=/etc/zfs/zpool.cache "rpool_$INST_UUID" >> "$CHROOT_LOG" 2>&1 && echo "100" >&3
-    ) | dialog --gauge "Creating ZFS cachefile for initcpio..." 10 70 0 >&3
+        zpool set cachefile=/etc/zfs/zpool.cache "$ZFS_POOL_NAME" >> "$CHROOT_LOG" 2>&1 && echo "100" >&3
+        
+    ) | dialog --gauge "Setting ZFS cachefile..." 10 70 0
 
-    if [[ $? -ne 0 ]]; then
-        debug $DEBUG_ERROR "Cache file creation failed"
-        error "Failed to generate cachefile!"
+    # Verify the cachefile was set
+    if ! zpool get cachefile "$ZFS_POOL_NAME" | grep -q "/etc/zfs/zpool.cache"; then
+        debug $DEBUG_ERROR "Failed to set ZFS cachefile"
+        error "Error setting ZFS cachefile!"
     fi
 
-    debug $DEBUG_INFO "Cache file created successfully"
-    printf "%s\n" "${bold}Cachefile created successfully!"
+    debug $DEBUG_INFO "ZFS cachefile set successfully"
+    printf "%s\n" "${bold}ZFS cachefile set successfully!"
 }
 
 regenerate_initcpio() {
