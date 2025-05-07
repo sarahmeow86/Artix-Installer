@@ -84,13 +84,18 @@ save_logs() {
         error "Failed to copy: $LOG_FILE"
     }
 
-    # Copy chroot log if it exists
-    if [[ -f "$CHROOT_LOG" ]]; then
-        debug $DEBUG_DEBUG "Copying chroot log"
-        cp "$CHROOT_LOG" "$log_dir/" || {
-            debug $DEBUG_ERROR "Failed to copy chroot log"
-            error "Failed to copy: $CHROOT_LOG"
-        }
+    # Copy chroot logs from the installation mount point if they exist
+    if [[ -d "$INST_MNT/var/log/artix-installer" ]]; then
+        debug $DEBUG_DEBUG "Checking for chroot logs in $INST_MNT/var/log/artix-installer/"
+        for chroot_log in "$INST_MNT/var/log/artix-installer"/chroot-*.log; do
+            if [[ -f "$chroot_log" ]]; then
+                debug $DEBUG_DEBUG "Copying chroot log: $(basename "$chroot_log")"
+                cp "$chroot_log" "$log_dir/" || {
+                    debug $DEBUG_ERROR "Failed to copy chroot log: $chroot_log"
+                    error "Failed to copy: $chroot_log"
+                }
+            fi
+        done
     fi
 
     debug $DEBUG_INFO "Installation logs saved to: $log_dir"
