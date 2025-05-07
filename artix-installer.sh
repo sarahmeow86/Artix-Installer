@@ -106,7 +106,7 @@ cleanup_mounts() {
             debug $DEBUG_ERROR "Failed to remove install directory"
             error "Failed to remove: $INST_MNT/install"
         }
-    }    
+    fi   
 
     # Then unmount everything under INST_MNT
     if mountpoint -q "$INST_MNT"; then
@@ -194,8 +194,17 @@ done
 VERSION="1.0.0"
 
 validate_filesystem() {
-    # Add your filesystem validation logic here
-    return 0
+    local valid_filesystems=("ext4" "btrfs" "zfs" "xfs")
+    local fs="$1"
+
+    for valid_fs in "${valid_filesystems[@]}"; do
+        if [[ "$fs" == "$valid_fs" ]]; then
+            return 0
+        fi
+    done
+
+    debug $DEBUG_ERROR "Invalid filesystem: $fs"
+    return 1
 }
 
 while [[ $# -gt 0 ]]; do
