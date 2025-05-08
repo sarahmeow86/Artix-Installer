@@ -7,7 +7,7 @@ DEBUG_INFO=3
 DEBUG_DEBUG=4
 
 # Default debug level and colors
-DEBUG_LEVEL=${DEBUG_LEVEL:-$DEBUG_INFO}
+DEBUG_LEVEL=3  # Default debug level (INFO)
 bold=$(tput setaf 2 bold)
 bolderror=$(tput setaf 3 bold)
 normal=$(tput sgr0)
@@ -195,6 +195,40 @@ for script in zfs-live.sh zfs-setup.sh inst_var.sh disksetup.sh installpkgs.sh \
     source "./scripts/$script" || error "Failed to source $script"
 done
 
+# Show help information
+show_help() {
+    cat << EOF
+Artix Linux Installer v${VERSION}
+
+Usage: $0 [OPTIONS]
+
+Options:
+    -h, --help              Show this help message and exit
+    -v, --version          Show version information and exit
+    -D, --debug-level N    Set debug level (0-4, default: 3)
+                           0: Off, 1: Error, 2: Warning, 3: Info, 4: Debug
+    -d, --disk DEVICE      Specify the installation disk device (must use /dev/disk/by-id/ format)
+    -f, --filesystem FS    Specify filesystem type (ext4, btrfs, zfs, xfs)
+    -p, --pool-name NAME   Specify ZFS pool name (forces ZFS filesystem)
+    -t, --timezone ZONE    Specify timezone (e.g., "Europe/Rome")
+    -H, --hostname NAME    Specify system hostname
+
+Examples:
+    $0 -D 4 -d /dev/disk/by-id/ata-SanDisk_SSD_PLUS_120GB_123456 -f ext4
+    $0 --filesystem zfs --pool-name mypool --hostname "artix-server"
+EOF
+    exit 0
+}
+
+validate_timezone() {
+    local tz="$1"
+    if [[ -f "/usr/share/zoneinfo/$tz" ]]; then
+        return 0
+    fi
+    debug $DEBUG_ERROR "Invalid timezone: $tz"
+    return 1
+}
+
 # Parse command line arguments
 VERSION="1.0.0"
 
@@ -212,11 +246,82 @@ validate_filesystem() {
     return 1
 }
 
+validate_debug_level() {
+    local level="$1"
+    if [[ "$level" =~ ^[0-4]$ ]]; then
+        return 0
+    fi
+    debug $DEBUG_ERROR "Invalid debug level: $level"
+    return 1
+}
+
+validate_disk_path() {
+    local disk_path="$1"
+    # Check if path starts with /dev/disk/by-id/
+    if [[ ! "$disk_path" =~ ^/dev/disk/by-id/ ]]; then
+        debug $DEBUG_ERROR "Invalid disk path format. Must use /dev/disk/by-id/ format"
+        return 1
+    fi
+    # Check if the disk exists
+    if [[ ! -b "$disk_path" ]]; then
+        debug $DEBUG_ERROR "Disk does not exist: $disk_path"
+        return 1
+    fi
+    return 0
+}
+
 while [[ $# -gt 0 ]]; do
     case $1 in
+        -h|--help)
+            show_help
+            ;;
         -v|--version)
             echo "Artix Installer version $VERSION"
             exit 0
+            ;;
+        -H|--hostname)
+            if [[ -n "$2" ]]; then
+                HOSTNAME="$2"
+                shift 2
+            else
+                error "Hostname argument required"
+            fi
+            ;;
+        -t|--timezone)
+            if [[ -n "$2" ]]; then
+                if validate_timezone "$2"; then
+                    TIMEZONE="$2"
+                else
+                    error "Invalid timezone: $2. Example format: Europe/Rome"
+                fi
+                shift 2
+            else
+                error "Timezone argument required"
+            fi
+            ;;
+        -D|--debug-level)
+            if [[ -n "$2" ]]; then
+                if validate_debug_level "$2"; then
+                    DEBUG_LEVEL="$2"
+                else
+                    error "Invalid debug level: $2. Valid options are 0-4"
+                fi
+                shift 2
+            else
+                error "Debug level argument required"
+            fi
+            ;;
+        -d|--disk)
+            if [[ -n "$2" ]]; then
+                if validate_disk_path "$2"; then
+                    DISK="$2"
+                else
+                    error "Invalid disk path: $2. Must use /dev/disk/by-id/ format"
+                fi
+                shift 2
+            else
+                error "Disk argument required"
+            fi
             ;;
         -f|--filesystem)
             if [[ -n "$2" ]]; then
@@ -260,10 +365,9 @@ perform_installation() {
     debug $DEBUG_INFO "Starting main installation process"
 
     # Select and configure filesystem
-        if [[ -z "$FILESYSTEM" ]]; then
-            choose_filesystem || error "Error selecting filesystem"
-        fi
-        debug $DEBUG_INFO "Selected filesystem: $FILESYSTEM"
+    if [[ -z "$FILESYSTEM" ]]; then
+        choose_filesystem || error "Error selecting filesystem"
+    fi
     debug $DEBUG_INFO "Selected filesystem: $FILESYSTEM"
 
     # Configure repositories
@@ -280,7 +384,20 @@ perform_installation() {
 
     # Configure installation variables
     debug $DEBUG_INFO "Configuring installation variables"
-    local var_steps=("installtz" "installhost" "installkrn" "selectdisk")
+    local var_steps=("installkrn")
+    # Only add hostname selection if no hostname was specified
+    if [[ -z "$HOSTNAME" ]]; then
+        var_steps+=("installhost")
+    fi
+    # Only add timezone selection if no timezone was specified
+    if [[ -z "$TIMEZONE" ]]; then
+        var_steps+=("installtz")
+    fi
+    # Only add disk selection if no disk was specified
+    if [[ -z "$DISK" ]]; then
+        var_steps+=("selectdisk")
+    fi
+    
     for step in "${var_steps[@]}"; do
         debug $DEBUG_DEBUG "Executing: $step"
         $step || error "Error in $step"
