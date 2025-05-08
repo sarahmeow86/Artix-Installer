@@ -17,33 +17,38 @@ partdrive() {
     debug $DEBUG_DEBUG "Calculating disk size"
     DISK_SIZE=$(get_disk_size "$disk")
     
-    # Calculate recommended swap size based on system RAM
-    debug $DEBUG_DEBUG "Calculating swap size"
-    RAM_SIZE=$(( $(grep MemTotal /proc/meminfo | awk '{print $2}') / 1024 / 1024 ))
-    if [ $RAM_SIZE -le 2 ]; then
-        RECOMMENDED_SWAP=$(( RAM_SIZE * 2 ))
-    elif [ $RAM_SIZE -le 8 ]; then
-        RECOMMENDED_SWAP=$RAM_SIZE
-    else
-        RECOMMENDED_SWAP=$RAM_SIZE
-    fi
-    debug $DEBUG_DEBUG "RAM: ${RAM_SIZE}GB, Recommended swap: ${RECOMMENDED_SWAP}GB"
-
-    # Prompt for swap size with recommended value
-    while true; do
-        debug $DEBUG_DEBUG "Prompting for swap size"
-        SWAP_SIZE=$(dialog --clear --title "Swap Partition Size" \
-            --inputbox "Enter the size of the swap partition in GB\nRecommended size: ${RECOMMENDED_SWAP}GB\nAvailable disk space: ${DISK_SIZE}GB" \
-            12 60 "$RECOMMENDED_SWAP" 3>&1 1>&2 2>&3)
-    
-        if [[ -n "$SWAP_SIZE" && "$SWAP_SIZE" =~ ^[0-9]+$ && "$SWAP_SIZE" -lt "$DISK_SIZE" ]]; then
-            debug $DEBUG_INFO "User selected swap size: ${SWAP_SIZE}GB"
-            break
+    # Only calculate and prompt for swap size if not provided via command line
+    if [[ -z "$SWAP_SIZE" ]]; then
+        debug $DEBUG_DEBUG "No swap size provided via command line, calculating recommended size"
+        # Calculate recommended swap size based on system RAM
+        RAM_SIZE=$(( $(grep MemTotal /proc/meminfo | awk '{print $2}') / 1024 / 1024 ))
+        if [ $RAM_SIZE -le 2 ]; then
+            RECOMMENDED_SWAP=$(( RAM_SIZE * 2 ))
+        elif [ $RAM_SIZE -le 8 ]; then
+            RECOMMENDED_SWAP=$RAM_SIZE
         else
-            debug $DEBUG_WARN "Invalid swap size entered"
-            dialog --title "Invalid Input" --msgbox "Invalid swap size! Please enter a positive integer less than ${DISK_SIZE}." 10 50
+            RECOMMENDED_SWAP=$RAM_SIZE
         fi
-    done
+        debug $DEBUG_DEBUG "RAM: ${RAM_SIZE}GB, Recommended swap: ${RECOMMENDED_SWAP}GB"
+
+        # Prompt for swap size with recommended value
+        while true; do
+            debug $DEBUG_DEBUG "Prompting for swap size"
+            SWAP_SIZE=$(dialog --clear --title "Swap Partition Size" \
+                --inputbox "Enter the size of the swap partition in GB\nRecommended size: ${RECOMMENDED_SWAP}GB\nAvailable disk space: ${DISK_SIZE}GB" \
+                12 60 "$RECOMMENDED_SWAP" 3>&1 1>&2 2>&3)
+        
+            if [[ -n "$SWAP_SIZE" && $(echo "$SWAP_SIZE" | grep -E '^[0-9]+$') && "$SWAP_SIZE" -lt "$DISK_SIZE" ]]; then
+                debug $DEBUG_INFO "User selected swap size: ${SWAP_SIZE}GB"
+                break
+            else
+                debug $DEBUG_WARN "Invalid swap size entered"
+                dialog --title "Invalid Input" --msgbox "Invalid swap size! Please enter a positive integer less than ${DISK_SIZE}." 10 50
+            fi
+        done
+    else
+        debug $DEBUG_INFO "Using provided swap size: ${SWAP_SIZE}GB"
+    fi
 
     # Calculate remaining space after EFI (1GB) and swap
     REMAINING_SPACE=$(( DISK_SIZE - SWAP_SIZE - 1 ))

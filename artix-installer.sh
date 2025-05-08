@@ -5,7 +5,6 @@ DEBUG_ERROR=1
 DEBUG_WARN=2
 DEBUG_INFO=3
 DEBUG_DEBUG=4
-
 # Default debug level and colors
 DEBUG_LEVEL=3  # Default debug level (INFO)
 bold=$(tput setaf 2 bold)
@@ -195,6 +194,25 @@ for script in zfs-live.sh zfs-setup.sh inst_var.sh disksetup.sh installpkgs.sh \
     source "./scripts/$script" || error "Failed to source $script"
 done
 
+validate_swap_size() {
+    local size="$1"
+    # Check if it's a positive integer
+    if [[ ! "$size" =~ ^[0-9]+$ ]]; then
+        debug $DEBUG_ERROR "Invalid swap size: must be a positive integer"
+        return 1
+    fi
+    # Get disk size to validate against
+    if [[ -n "$DISK" ]]; then
+        local disk_size=$(lsblk -b -n -d -o SIZE "$DISK")
+        disk_size=$((disk_size / 1024 / 1024 / 1024)) # Convert to GB
+        if [[ $size -ge $disk_size ]]; then
+            debug $DEBUG_ERROR "Swap size ($size GB) must be less than disk size ($disk_size GB)"
+            return 1
+        fi
+    fi
+    return 0
+}
+
 # Show help information
 show_help() {
     cat << EOF
@@ -212,10 +230,11 @@ Options:
     -p, --pool-name NAME   Specify ZFS pool name (forces ZFS filesystem)
     -t, --timezone ZONE    Specify timezone (e.g., "Europe/Rome")
     -H, --hostname NAME    Specify system hostname
+    -s, --swap-size SIZE   Specify swap partition size in GB (must be positive integer)
 
 Examples:
-    $0 -D 4 -d /dev/disk/by-id/ata-SanDisk_SSD_PLUS_120GB_123456 -f ext4
-    $0 --filesystem zfs --pool-name mypool --hostname "artix-server"
+    $0 -d 4 -D /dev/disk/by-id/ata-SanDisk_SSD_PLUS_120GB_123456 -f ext4 -s 8
+    $0 --filesystem zfs --pool-name mypool --swap-size 16
 EOF
     exit 0
 }
@@ -342,6 +361,18 @@ while [[ $# -gt 0 ]]; do
                 shift 2
             else
                 error "Pool name argument required"
+            fi
+            ;;
+        -s|--swap-size)
+            if [[ -n "$2" ]]; then
+                if validate_swap_size "$2"; then
+                    SWAP_SIZE="$2"
+                else
+                    error "Invalid swap size: $2. Must be a positive integer less than disk size"
+                fi
+                shift 2
+            else
+                error "Swap size argument required"
             fi
             ;;
         *)
