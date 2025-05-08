@@ -260,7 +260,10 @@ perform_installation() {
     debug $DEBUG_INFO "Starting main installation process"
 
     # Select and configure filesystem
-    choose_filesystem || error "Error selecting filesystem"
+        if [[ -z "$FILESYSTEM" ]]; then
+            choose_filesystem || error "Error selecting filesystem"
+        fi
+        debug $DEBUG_INFO "Selected filesystem: $FILESYSTEM"
     debug $DEBUG_INFO "Selected filesystem: $FILESYSTEM"
 
     # Configure repositories
