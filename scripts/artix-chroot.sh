@@ -313,6 +313,10 @@ cachefile() {
 }
 
 regenerate_initcpio() {
+    # Save original stdout and stderr
+    exec 3>&1
+    exec 4>&2
+    
     debug $DEBUG_INFO "Starting initramfs regeneration"
     # Start the progress bar
     (
@@ -333,6 +337,12 @@ regenerate_initcpio() {
 
     debug $DEBUG_INFO "Initramfs regenerated successfully"
     printf "%s\n" "${bold}Initramfs regenerated successfully!"
+
+    # Restore original stdout and stderr
+    exec 1>&3
+    exec 2>&4
+    exec 3>&-
+    exec 4>&-
 }
 
 configure_bootloader() {
