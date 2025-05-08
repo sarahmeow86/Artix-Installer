@@ -445,7 +445,6 @@ enable_boot_services() {
         error "Boot services file not found: $boot_services_file"
     fi
 
-    echo "Adding boot runlevel services..." >&3; sleep 1
     while IFS= read -r service; do
         # Skip empty lines and comments
         [[ -z "$service" || "$service" =~ ^# ]] && continue
@@ -480,7 +479,6 @@ enable_default_services() {
         error "Default services file not found: $default_services_file"
     fi
 
-    echo "Adding default runlevel services..." >&3; sleep 1
     while IFS= read -r service; do
         # Skip empty lines and comments
         [[ -z "$service" || "$service" =~ ^# ]] && continue
@@ -518,11 +516,13 @@ enableservices() {
     (
         echo "5" >&3; sleep 1
         
-        # Enable boot services
+        # Enable boot services and show progress
+        echo "Enabling boot services..." >&3
         enable_boot_services
         echo "40" >&3
 
-        # Enable default services
+        # Enable default services and show progress
+        echo "Enabling default services..." >&3
         enable_default_services
         echo "70" >&3
 
