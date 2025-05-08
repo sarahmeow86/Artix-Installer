@@ -233,7 +233,7 @@ Options:
     -s, --swap-size SIZE   Specify swap partition size in GB (must be positive integer)
 
 Examples:
-    $0 -d 4 -D /dev/disk/by-id/ata-SanDisk_SSD_PLUS_120GB_123456 -f ext4 -s 8
+    $0 -D 4 -d /dev/disk/by-id/ata-SanDisk_SSD_PLUS_120GB_123456 -f ext4 -s 8
     $0 --filesystem zfs --pool-name mypool --swap-size 16
 EOF
     exit 0

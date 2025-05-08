@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 get_disk_size() {
-    local disk=$1
-    debug $DEBUG_DEBUG "Getting disk size for: /dev/disk/by-id/$disk"
-    local size=$(lsblk -b -n -d -o SIZE "/dev/disk/by-id/$disk")
+    local disk_path=$1
+    debug $DEBUG_DEBUG "Getting disk size for: $disk_path"
+    local size=$(lsblk -b -n -d -o SIZE "$disk_path")
     local size_gb=$(( size / 1024 / 1024 / 1024 ))
     debug $DEBUG_DEBUG "Disk size: ${size_gb}GB"
     echo $size_gb
@@ -15,7 +15,7 @@ partdrive() {
 
     # Get total disk size in GB
     debug $DEBUG_DEBUG "Calculating disk size"
-    DISK_SIZE=$(get_disk_size "$disk")
+    DISK_SIZE=$(get_disk_size "$DISK")
     
     # Only calculate and prompt for swap size if not provided via command line
     if [[ -z "$SWAP_SIZE" ]]; then
@@ -57,36 +57,36 @@ partdrive() {
     # Start partitioning
     (
         echo "10"; sleep 1
-        debug $DEBUG_DEBUG "Wiping disk: /dev/disk/by-id/$disk"
+        debug $DEBUG_DEBUG "Wiping disk: $DISK"
         echo "Wiping disk..."; sleep 1
-        sgdisk --zap-all "/dev/disk/by-id/$disk" >> "$LOG_FILE" 2>&1 && echo "20"
+        sgdisk --zap-all "$DISK" >> "$LOG_FILE" 2>&1 && echo "20"
 
         debug $DEBUG_DEBUG "Creating EFI partition (1GB)"
         echo "Creating EFI partition..."; sleep 1
-        sgdisk -n1:0:+1G -t1:EF00 "/dev/disk/by-id/$disk" >> "$LOG_FILE" 2>&1 && echo "40"
+        sgdisk -n1:0:+1G -t1:EF00 "$DISK" >> "$LOG_FILE" 2>&1 && echo "40"
 
         if [[ "$FILESYSTEM" == "zfs" ]]; then
             debug $DEBUG_DEBUG "Creating ZFS partition"
             echo "Creating ZFS partition..."; sleep 1
-            sgdisk -n2:0:-${SWAP_SIZE}G -t2:BF00 "/dev/disk/by-id/$disk" >> "$LOG_FILE" 2>&1 && echo "60"
+            sgdisk -n2:0:-${SWAP_SIZE}G -t2:BF00 "$DISK" >> "$LOG_FILE" 2>&1 && echo "60"
         else
             # Calculate root partition size (40% of remaining space)
             ROOT_SIZE=$(( REMAINING_SPACE * 40 / 100 ))
             debug $DEBUG_DEBUG "Creating root partition (${ROOT_SIZE}GB)"
             echo "Creating root partition..."; sleep 1
-            sgdisk -n2:0:+${ROOT_SIZE}G -t2:8300 "/dev/disk/by-id/$disk" >> "$LOG_FILE" 2>&1 && echo "60"
+            sgdisk -n2:0:+${ROOT_SIZE}G -t2:8300 "$DISK" >> "$LOG_FILE" 2>&1 && echo "60"
             
             debug $DEBUG_DEBUG "Creating home partition"
             echo "Creating home partition..."; sleep 1
-            sgdisk -n3:0:-${SWAP_SIZE}G -t3:8300 "/dev/disk/by-id/$disk" >> "$LOG_FILE" 2>&1 && echo "80"
+            sgdisk -n3:0:-${SWAP_SIZE}G -t3:8300 "$DISK" >> "$LOG_FILE" 2>&1 && echo "80"
         fi
 
         debug $DEBUG_DEBUG "Creating swap partition (${SWAP_SIZE}GB)"
         echo "Creating swap partition..."; sleep 1
         if [[ "$FILESYSTEM" == "zfs" ]]; then
-            sgdisk -n3:0:0 -t3:8308 "/dev/disk/by-id/$disk" >> "$LOG_FILE" 2>&1 && echo "90"
+            sgdisk -n3:0:0 -t3:8308 "$DISK" >> "$LOG_FILE" 2>&1 && echo "90"
         else
-            sgdisk -n4:0:0 -t4:8308 "/dev/disk/by-id/$disk" >> "$LOG_FILE" 2>&1 && echo "90"
+            sgdisk -n4:0:0 -t4:8308 "$DISK" >> "$LOG_FILE" 2>&1 && echo "90"
         fi
 
         debug $DEBUG_DEBUG "Running partprobe"
