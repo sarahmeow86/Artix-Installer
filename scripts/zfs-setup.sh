@@ -16,7 +16,7 @@ rootpool() {
         debug $DEBUG_DEBUG "Running zpool create command"
         zpool create -f -o ashift=12 -O acltype=posixacl -O canmount=off -O compression=zstd \
             -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa \
-            -O mountpoint=/ -R $INST_MNT "$ZFS_POOL_NAME" /dev/disk/by-id/$disk-part2 >> "$LOG_FILE" 2>&1 && echo "50"
+            -O mountpoint=/ -R $INST_MNT "$ZFS_POOL_NAME" "${DISK}-part2" >> "$LOG_FILE" 2>&1 && echo "50"
         
         debug $DEBUG_DEBUG "ZFS pool creation completed"
         sleep 1
