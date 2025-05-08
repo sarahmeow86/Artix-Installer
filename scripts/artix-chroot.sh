@@ -267,24 +267,49 @@ zfsservice() {
 }
 
 cachefile() {
+    # Save original stdout and stderr
+    exec 3>&1
+    exec 4>&2
+    
     debug $DEBUG_INFO "Starting ZFS cache file creation"
+    
     # Start the progress bar
     (
         echo "10" >&3; sleep 1
         debug $DEBUG_DEBUG "Setting ZFS cachefile location"
         echo "Setting ZFS cachefile..." >&3; sleep 1
-        zpool set cachefile=/etc/zfs/zpool.cache "$ZFS_POOL_NAME" >> "$CHROOT_LOG" 2>&1 && echo "100" >&3
         
-    ) | dialog --gauge "Setting ZFS cachefile..." 10 70 0
+        # First ensure the directory exists
+        mkdir -p /etc/zfs >> "$CHROOT_LOG" 2>&1 || {
+            debug $DEBUG_ERROR "Failed to create /etc/zfs directory"
+            error "Error creating ZFS configuration directory!"
+        }
+        echo "30" >&3
 
-    # Verify the cachefile was set
-    if ! zpool get cachefile "$ZFS_POOL_NAME" | grep -q "/etc/zfs/zpool.cache"; then
-        debug $DEBUG_ERROR "Failed to set ZFS cachefile"
-        error "Error setting ZFS cachefile!"
-    fi
+        # Set the cachefile
+        if ! zpool set cachefile=/etc/zfs/zpool.cache "$ZFS_POOL_NAME" >> "$CHROOT_LOG" 2>&1; then
+            debug $DEBUG_ERROR "Failed to set ZFS cachefile"
+            error "Error setting ZFS cachefile!"
+        fi
+        echo "70" >&3
+
+        # Verify the cache file was created and is accessible
+        if [[ ! -f "/etc/zfs/zpool.cache" ]]; then
+            debug $DEBUG_ERROR "ZFS cache file was not created"
+            error "ZFS cache file was not created!"
+        fi
+        echo "100" >&3
+        
+    ) | dialog --gauge "Setting ZFS cachefile..." 10 70 0 >&3
 
     debug $DEBUG_INFO "ZFS cachefile set successfully"
     printf "%s\n" "${bold}ZFS cachefile set successfully!"
+
+    # Restore original stdout and stderr
+    exec 1>&3
+    exec 2>&4
+    exec 3>&-
+    exec 4>&-
 }
 
 regenerate_initcpio() {
