@@ -143,6 +143,18 @@ detect_root_filesystem() {
         debug $DEBUG_ERROR "Failed to detect root filesystem"
         error "Failed to detect the root filesystem!"
     fi
+    
+    # If root is ZFS, get the pool name
+    if [[ "$ROOT_FS" == "zfs" ]]; then
+        ZFS_POOL_NAME=$(zfs list -H -o name / | cut -d'/' -f1)
+        if [[ -z "$ZFS_POOL_NAME" ]]; then
+            debug $DEBUG_ERROR "Failed to detect ZFS pool name"
+            error "Failed to detect the ZFS pool name!"
+        fi
+        debug $DEBUG_INFO "ZFS pool detected: $ZFS_POOL_NAME"
+        export ZFS_POOL_NAME
+    fi
+    
     debug $DEBUG_INFO "Root filesystem detected: $ROOT_FS"
     printf "%s\n" "${bold}Detected root filesystem: $ROOT_FS"
 }
