@@ -47,6 +47,9 @@ setup_filesystem() {
             btrfs subvolume create $INST_MNT/@cache >> "$LOG_FILE" 2>&1 || error "Failed to create var subvolume!"
             btrfs subvolume create $INST_MNT/@log >> "$LOG_FILE" 2>&1 || error "Failed to create var log subvolume!"
             
+            debug $DEBUG_DEBUG "Formatting home partition as ext4"            
+            mkfs.ext4 -F "${DISK}-part3" >> "$LOG_FILE" 2>&1 || error "Failed to format home partition!"
+
             debug $DEBUG_DEBUG "Remounting with subvolumes"
             umount $INST_MNT >> "$LOG_FILE" 2>&1 || error "Failed to unmount Btrfs filesystem!"
             mount -o subvol=@ "${DISK}-part2" $INST_MNT >> "$LOG_FILE" 2>&1 || error "Failed to mount root subvolume!"
@@ -54,6 +57,8 @@ setup_filesystem() {
             mount -o subvol=@cache "${DISK}-part2" $INST_MNT/var/cache >> "$LOG_FILE" 2>&1 || error "Failed to mount var cache!"
             mkdir -p $INST_MNT/var/log >> "$LOG_FILE" 2>&1 || error "Failed to create var log directory!"
             mount -o subvol=@log "${DISK}-part2" $INST_MNT/var/log >> "$LOG_FILE" 2>&1 || error "Failed to mount var log!"
+            mkdir -p $INST_MNT/home >> "$LOG_FILE" 2>&1 || error "Failed to create home directory!"
+            mount --mkdir "${DISK}-part3" $INST_MNT/home >> "$LOG_FILE" 2>&1 || error "Failed to mount home!"
             ;;
         xfs)
             debug $DEBUG_DEBUG "Formatting root partition as xfs"
