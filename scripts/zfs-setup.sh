@@ -8,15 +8,23 @@ rootpool() {
     debug $DEBUG_DEBUG "Using disk: $DISK"
     debug $DEBUG_DEBUG "Creating ZFS root pool on: ${DISK}-part2"
     debug $DEBUG_DEBUG "Using pool name: $ZFS_POOL_NAME"
+    
+    # Generate and save hostid for consistent pool import
+    debug $DEBUG_DEBUG "Generating hostid"
+    mkdir -p "$INST_MNT/etc"
+    zgenhostid -o "$INST_MNT/etc/hostid" $(hostid)
 
     # Start the progress bar
     (
         echo "10"; sleep 1
         echo "Creating ZFS root pool..."; sleep 1
         debug $DEBUG_DEBUG "Running zpool create command"
-        zpool create -f -o ashift=12 -O acltype=posixacl -O canmount=off -O compression=zstd \
+        zpool create -f -o ashift=12 \
+            -O acltype=posixacl -O canmount=off -O compression=zstd \
             -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa \
-            -O mountpoint=/ -R $INST_MNT "$ZFS_POOL_NAME" "${DISK}-part2" >> "$LOG_FILE" 2>&1 && echo "50"
+            -O mountpoint=/ -O devices=on \
+            -o cachefile=/etc/zfs/zpool.cache \
+            -R $INST_MNT "$ZFS_POOL_NAME" "${DISK}-part2" >> "$LOG_FILE" 2>&1 && echo "50"
         
         debug $DEBUG_DEBUG "ZFS pool creation completed"
         sleep 1
@@ -47,11 +55,26 @@ createdatasets() {
         
         echo "Creating root filesystem..."; sleep 1
         debug $DEBUG_DEBUG "Creating root filesystem dataset"
-        zfs create -o mountpoint=/ -o canmount=noauto "$ZFS_POOL_NAME/ROOT/default" >> "$LOG_FILE" 2>&1 && echo "60"
+        zfs create -o mountpoint=/ -o canmount=on -o atime=on \
+            -o devices=on -o exec=on -o setuid=on \
+            "$ZFS_POOL_NAME/ROOT/default" >> "$LOG_FILE" 2>&1 && echo "40"
+            
+        # Ensure root dataset import and mount at boot
+        debug $DEBUG_DEBUG "Setting additional root dataset properties"
+        zfs set org.openzfs.systemd:wanted-by=zfs-mount.service "$ZFS_POOL_NAME/ROOT/default" >> "$LOG_FILE" 2>&1 && echo "60"
         
         echo "Creating home dataset..."; sleep 1
         debug $DEBUG_DEBUG "Creating home dataset"
-        zfs create -o mountpoint=/home "$ZFS_POOL_NAME/home" >> "$LOG_FILE" 2>&1 && echo "100"
+        zfs create -o mountpoint=/home -o canmount=on -o devices=on \
+            "$ZFS_POOL_NAME/home" >> "$LOG_FILE" 2>&1 && echo "80"
+            
+        # Ensure cache directory exists in the installation
+        debug $DEBUG_DEBUG "Creating ZFS cache directory"
+        mkdir -p "$INST_MNT/etc/zfs" >> "$LOG_FILE" 2>&1
+        
+        # Copy the zpool cache to the installation
+        debug $DEBUG_DEBUG "Copying zpool cache"
+        cp /etc/zfs/zpool.cache "$INST_MNT/etc/zfs/" >> "$LOG_FILE" 2>&1 && echo "100"
     ) | dialog --gauge "Creating ZFS datasets..." 10 70 0
 
     # Verify datasets
