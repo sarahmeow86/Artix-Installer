@@ -14,9 +14,9 @@ rootpool() {
         echo "10"; sleep 1
         echo "Creating ZFS root pool..."; sleep 1
         debug $DEBUG_DEBUG "Running zpool create command"
-        zpool create -f -o ashift=12 -O acltype=posixacl -O canmount=off -O compression=zstd \
-            -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa \
-            -O mountpoint=/ -R $INST_MNT "$ZFS_POOL_NAME" "${DISK}-part2" >> "$LOG_FILE" 2>&1 && echo "50"
+        zpool create -f -o ashift=12 -o autotrim=on \
+            -O acltype=posixacl -O xattr=sa -O relatime=on -O compression=lz4 -m none \
+            -R $INST_MNT "$ZFS_POOL_NAME" "${DISK}-part2" >> "$LOG_FILE" 2>&1 && echo "50"
         
         debug $DEBUG_DEBUG "ZFS pool creation completed"
         sleep 1
@@ -41,13 +41,13 @@ createdatasets() {
     # Start the progress bar
     (
         echo "10"; sleep 1
-        echo "Creating ROOT dataset..."; sleep 1
-        debug $DEBUG_DEBUG "Creating ROOT dataset structure"
-        zfs create -o mountpoint=none "$ZFS_POOL_NAME/ROOT" >> "$LOG_FILE" 2>&1 && echo "30"
+        echo "Creating os dataset..."; sleep 1
+        debug $DEBUG_DEBUG "Creating os dataset structure"
+        zfs create -o mountpoint=none "$ZFS_POOL_NAME/os" >> "$LOG_FILE" 2>&1 && echo "30"
         
         echo "Creating root filesystem..."; sleep 1
         debug $DEBUG_DEBUG "Creating root filesystem dataset"
-        zfs create -o mountpoint=/ -o canmount=noauto "$ZFS_POOL_NAME/ROOT/default" >> "$LOG_FILE" 2>&1 && echo "60"
+        zfs create -o mountpoint=/ -o canmount=noauto "$ZFS_POOL_NAME/os/artix" >> "$LOG_FILE" 2>&1 && echo "60"
         
         echo "Creating home dataset..."; sleep 1
         debug $DEBUG_DEBUG "Creating home dataset"
@@ -56,11 +56,15 @@ createdatasets() {
 
     # Verify datasets
     debug $DEBUG_DEBUG "Verifying created datasets"
-    if ! zfs list "$ZFS_POOL_NAME/ROOT/default" >> "$LOG_FILE" 2>&1 || 
+    if ! zfs list "$ZFS_POOL_NAME/os/artix" >> "$LOG_FILE" 2>&1 || 
        ! zfs list "$ZFS_POOL_NAME/home" >> "$LOG_FILE" 2>&1; then
         debug $DEBUG_ERROR "Failed to create ZFS datasets"
         error "Error creating the datasets!"
     fi
+
+    # Set properties for the datasets
+    debug $DEBUG_DEBUG "Setting properties for zfsbootmenu"
+    zfs set org.zfsbootmenu:bootfs="$ZFS_POOL_NAME/os/artix" "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1 || error "Failed to set bootfs property!"    
 
     debug $DEBUG_INFO "Datasets created successfully"
     printf "%s\n" "${bold}Datasets created successfully!"
@@ -75,7 +79,7 @@ mountall() {
         echo "10"; sleep 1
         echo "Mounting root dataset..."; sleep 1
         debug $DEBUG_DEBUG "Mounting root dataset"
-        zfs mount "$ZFS_POOL_NAME/ROOT/default" >> "$LOG_FILE" 2>&1 && echo "50"
+        zfs mount "$ZFS_POOL_NAME/os/artix" >> "$LOG_FILE" 2>&1 && echo "50"
         
         echo "Mounting home dataset..."; sleep 1
         debug $DEBUG_DEBUG "Mounting home dataset"
@@ -84,7 +88,7 @@ mountall() {
 
     # Verify mounts
     debug $DEBUG_DEBUG "Verifying dataset mounts"
-    if ! zfs mount | grep -q "$ZFS_POOL_NAME/ROOT/default" || 
+    if ! zfs mount | grep -q "$ZFS_POOL_NAME/os/artix" || 
        ! zfs mount | grep -q "$ZFS_POOL_NAME/home"; then
         debug $DEBUG_ERROR "Failed to mount ZFS datasets"
         error "Error mounting datasets!"
