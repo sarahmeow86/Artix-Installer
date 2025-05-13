@@ -97,7 +97,7 @@ mountall() {
 
     # Setting cachefile and zgenhostid files
     debug $DEBUG_DEBUG "Setting cachefile and zgenhostid files"
-    zfs set cachefile=/etc/zfs/zpool.cache "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1 || error "Failed to set cachefile property!"
+    zpool set cachefile=/etc/zfs/zpool.cache "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1 || error "Failed to set cachefile property!"
     zfs set org.zfsbootmenu:commandline="quiet loglevel=4" "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1 || error "Failed to set commandline property!"
     mkdir -p "$INST_MNT/etc/zfs" >> "$LOG_FILE" 2>&1 || error "Failed to create /etc/zfs directory!"
     cp /etc/zfs/zpool.cache "$INST_MNT/etc/zfs/zpool.cache" >> "$LOG_FILE" 2>&1 || error "Failed to copy zpool.cache file!"
