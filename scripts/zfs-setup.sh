@@ -19,7 +19,6 @@ rootpool() {
             -O acltype=posixacl -O xattr=sa -O relatime=on -O compression=lz4 -m none \
             -R $INST_MNT "$ZFS_POOL_NAME" "${DISK}-part2" >> "$LOG_FILE" 2>&1 && echo "50"
         
-        zpool set cachefile=/etc/zfs/zpool.cache "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1 && echo "70"   
         debug $DEBUG_DEBUG "ZFS pool creation completed"
         sleep 1
         echo "Finalizing setup..."; sleep 1
