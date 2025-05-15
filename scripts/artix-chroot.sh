@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Debug levels
 DEBUG_OFF=0; DEBUG_ERROR=1; DEBUG_WARN=2; DEBUG_INFO=3; DEBUG_DEBUG=4
-DEBUG_LEVEL=${DEBUG_LEVEL:-$DEBUG_ERROR}  # Default to ERROR if not set
+DEBUG_LEVEL=${DEBUG_LEVEL:-$DEBUG_INFO}  # Default to INFO if not set
 
 
 # Create chroot-specific log file
