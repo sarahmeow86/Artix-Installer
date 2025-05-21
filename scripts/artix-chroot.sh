@@ -372,10 +372,10 @@ enable_boot_services() {
 
     if [[ ! -f "$boot_services_file" ]]; then
         debug $DEBUG_ERROR "Boot services file not found: $boot_services_file"
-        restore_descriptors
-        error "Boot services file not found: $boot_services_file"
+        return 1
     fi
 
+    local failed=0
     while IFS= read -r service; do
         [[ -z "$service" || "$service" =~ ^# ]] && continue
         
@@ -391,15 +391,16 @@ enable_boot_services() {
         fi
 
         debug $DEBUG_INFO "Enabling service $service in boot runlevel"
-        if ! rc-update add "$service" boot >/dev/null 2>&4; then
+        if ! rc-update add "$service" boot; then
             debug $DEBUG_ERROR "Failed to enable service: $service"
-            restore_descriptors
-            error "Failed to enable service: $service"
+            failed=1
+        else
+            debug $DEBUG_INFO "Successfully enabled service: $service"
         fi
-        debug $DEBUG_INFO "Successfully enabled service: $service"
     done < "$boot_services_file"
     
     debug $DEBUG_INFO "Boot services configuration completed"
+    return $failed
 }
 
 enable_default_services() {
@@ -410,10 +411,10 @@ enable_default_services() {
 
     if [[ ! -f "$default_services_file" ]]; then
         debug $DEBUG_ERROR "Default services file not found: $default_services_file"
-        restore_descriptors
-        error "Default services file not found: $default_services_file"
+        return 1
     fi
 
+    local failed=0
     while IFS= read -r service; do
         [[ -z "$service" || "$service" =~ ^# ]] && continue
         
@@ -429,15 +430,16 @@ enable_default_services() {
         fi
 
         debug $DEBUG_INFO "Enabling service $service in default runlevel"
-        if ! rc-update add "$service" default >/dev/null 2>&4; then
+        if ! rc-update add "$service" default; then
             debug $DEBUG_ERROR "Failed to enable service: $service"
-            restore_descriptors
-            error "Failed to enable service: $service"
+            failed=1
+        else
+            debug $DEBUG_INFO "Successfully enabled service: $service"
         fi
-        debug $DEBUG_INFO "Successfully enabled service: $service"
     done < "$default_services_file"
     
     debug $DEBUG_INFO "Default services configuration completed"
+    return $failed
 }
 
 enableservices() {
@@ -450,21 +452,26 @@ enableservices() {
         
         debug $DEBUG_INFO "Configuring boot services"
         echo "Enabling boot services..." >&3
-        enable_boot_services
+        if ! enable_boot_services; then
+            restore_descriptors
+            error "Failed to enable boot services"
+        fi
         echo "40" >&3
 
         debug $DEBUG_INFO "Configuring default services"
         echo "Enabling default services..." >&3
-        enable_default_services
+        if ! enable_default_services; then
+            restore_descriptors
+            error "Failed to enable default services"
+        fi
         echo "70" >&3
 
         debug $DEBUG_INFO "Verifying service configuration"
         echo "Verifying services..." >&3; sleep 1
-        if ! rc-update show >/dev/null 2>&4; then
-            debug $DEBUG_ERROR "Service verification failed"
+        rc-update show > /dev/null || {
             restore_descriptors
             error "Failed to verify services!"
-        fi
+        }
         echo "100" >&3
         debug $DEBUG_INFO "Service configuration completed successfully"
     ) | dialog --gauge "Enabling system services..." 10 70 0 >&3
