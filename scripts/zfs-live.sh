@@ -11,14 +11,12 @@ installzfs() {
     # Start the progress bar
     (
         echo "10"; sleep 1
-        echo "Updating package database..."; sleep 1
-        pacman -Sy --noconfirm --needed zfs-dkms-git zfs-utils-git gptfdisk && echo "20"
+        echo "Installing ZFS packages..."; sleep 1
+        pacman -U --noconfirm misc/zfs-dkms-git-*.pkg.tar.zst misc/zfs-utils-git-*.pkg.tar.zst && echo "40"
         echo "Installing ZFS OpenRC package..."; sleep 1
-        pacman -U --noconfirm misc/zfs-openrc-20241023-1-any.pkg.tar.zst && echo "50"
+        pacman -U --noconfirm misc/zfs-openrc-*.pkg.tar.zst && echo "70"
         echo "Loading ZFS kernel module..."; sleep 1
-        modprobe zfs && echo "70"
-        echo "Enabling ZFS services..."; sleep 1
-        rc-update add zfs-zed boot && rc-service zfs-zed start && echo "80"
+        modprobe zfs && echo "90"
         zgenhostid -f && echo "100"
     ) | dialog --gauge "Installing ZFS modules..." 10 70 0
 

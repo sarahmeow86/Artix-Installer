@@ -17,8 +17,9 @@ installpkgs() {
         # Install ZFS packages if ZFS is selected
         if [[ $FILESYSTEM == "zfs" ]]; then
             echo "Installing ZFS packages..."; sleep 1
-            debug $DEBUG_DEBUG "Installing ZFS packages"
-            basestrap $INST_MNT zfs-dkms-git zfs-utils-git >> "$LOG_FILE" 2>&1 && echo "90"
+            debug $DEBUG_DEBUG "Installing ZFS packages from misc directory"
+            basestrap $INST_MNT misc/zfs-dkms-git-*.pkg.tar.zst misc/zfs-utils-git-*.pkg.tar.zst \
+                misc/zfs-openrc-*.pkg.tar.zst >> "$LOG_FILE" 2>&1 && echo "90"
         fi
         
         echo "Copying pacman configuration..."; sleep 1
