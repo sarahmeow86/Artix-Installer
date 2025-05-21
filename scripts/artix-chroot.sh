@@ -157,6 +157,17 @@ install_grub() {
     debug $DEBUG_INFO "Starting GRUB installation"
     exec 3>&1 4>&2
     
+    # Get ZFS pool name from mounted system
+    if [[ "$ROOT_FS" == "zfs" ]]; then
+        debug $DEBUG_INFO "Getting ZFS pool name from mounted system"
+        ZFS_POOL_NAME=$(findmnt -no source / | cut -d/ -f1)
+        if [[ -z "$ZFS_POOL_NAME" ]]; then
+            debug $DEBUG_ERROR "Failed to detect ZFS pool name"
+            error "Could not determine ZFS pool name"
+        fi
+        debug $DEBUG_INFO "Found ZFS pool name: $ZFS_POOL_NAME"
+    fi
+
     dialog --infobox "Installing and configuring GRUB bootloader..." 5 50 >&3
     (
         echo "10" >&3; sleep 1
@@ -167,11 +178,24 @@ install_grub() {
             exec 1>&3 2>&4
             error "Failed to install GRUB packages!"
         fi
-        echo "50" >&3
+        echo "40" >&3
+
+        debug $DEBUG_INFO "Configuring GRUB defaults for ZFS"
+        echo "Configuring GRUB defaults..." >&3
+        if [[ "$ROOT_FS" == "zfs" ]]; then
+            debug $DEBUG_DEBUG "Setting ZFS root command line in GRUB"
+            sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"root=ZFS=${ZFS_POOL_NAME}/os/artix quiet\"|" \
+                /etc/default/grub >/dev/null 2>&4 || {
+                debug $DEBUG_ERROR "Failed to configure GRUB defaults"
+                exec 1>&3 2>&4
+                error "Failed to configure GRUB for ZFS!"
+            }
+        fi
+        echo "60" >&3
         
         debug $DEBUG_INFO "Installing GRUB to EFI partition"
         echo "Installing GRUB to EFI system partition..." >&3
-        if ! grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB >/dev/null 2>&4; then
+        if ! grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB --force >/dev/null 2>&4; then
             debug $DEBUG_ERROR "Failed to install GRUB to EFI partition"
             exec 1>&3 2>&4
             error "Failed to install GRUB!"
@@ -190,89 +214,6 @@ install_grub() {
     ) | dialog --gauge "Installing GRUB bootloader..." 10 70 0 >&3
 
     dialog --msgbox "GRUB has been installed and configured successfully!" 10 50 >&3
-    
-    exec 1>&3 2>&4 3>&- 4>&-
-}
-
-install_zfsbootmenu() {
-    debug $DEBUG_INFO "Starting ZFSBootMenu installation"
-    exec 3>&1 4>&2
-    
-    dialog --infobox "Installing ZFSBootMenu..." 5 50 >&3
-    (
-        echo "10" >&3; sleep 1
-        debug $DEBUG_INFO "Creating ZFSBootMenu directory"
-        echo "Creating ZFSBootMenu directory..." >&3
-        if ! mkdir -p /boot/efi/EFI/BOOT >/dev/null 2>&4; then
-            debug $DEBUG_ERROR "Failed to create ZFSBootMenu directory"
-            exec 1>&3 2>&4
-            error "Failed to create ZFSBootMenu directory!"
-        fi
-        echo "30" >&3
-
-        debug $DEBUG_INFO "Downloading ZFSBootMenu EFI file"
-        echo "Downloading ZFSBootMenu EFI file..." >&3
-        if ! curl -L https://get.zfsbootmenu.org/efi -o /boot/efi/EFI/BOOT/BOOTX64.EFI >/dev/null 2>&4; then
-            debug $DEBUG_ERROR "Failed to download ZFSBootMenu EFI file"
-            exec 1>&3 2>&4
-            error "Failed to download ZFSBootMenu EFI file!"
-        fi
-        echo "70" >&3
-
-        debug $DEBUG_INFO "Configuring EFI boot entry"
-        echo "Configuring EFI boot entry..." >&3
-        if ! efibootmgr --disk $(findmnt -n -o SOURCE /boot/efi | sed 's/[0-9]*$//') --part 1 \
-            --create --label "ZFSBootMenu" \
-            --loader '\EFI\BOOT\BOOTX64.EFI' \
-            --unicode "spl_hostid=$(hostid) zbm.timeout=3 zbm.prefer=$ZFS_POOL_NAME zbm.import_policy=hostid" \
-            --verbose >/dev/null 2>&4; then
-            debug $DEBUG_ERROR "Failed to configure EFI boot entry"
-            exec 1>&3 2>&4
-            error "Failed to configure EFI boot entry!"
-        fi
-        echo "100" >&3
-        debug $DEBUG_INFO "ZFSBootMenu installation completed successfully"
-    ) | dialog --gauge "Installing ZFSBootMenu..." 10 70 0 >&3
-
-    dialog --msgbox "ZFSBootMenu has been installed and configured successfully!" 10 50 >&3
-    
-    exec 1>&3 2>&4 3>&- 4>&-
-}
-
-zfsservice() {
-    debug $DEBUG_INFO "Configuring ZFS services"
-    exec 3>&1 4>&2
-    
-    (
-        echo "10" >&3; sleep 1
-        debug $DEBUG_INFO "Installing ZFS OpenRC package"
-        echo "Installing ZFS OpenRC package..." >&3
-        if ! pacman -U --noconfirm /install/zfs-openrc-20241023-1-any.pkg.tar.zst >/dev/null 2>&4; then
-            debug $DEBUG_ERROR "Failed to install ZFS OpenRC package"
-            exec 1>&3 2>&4
-            error "Failed to install ZFS OpenRC package!"
-        fi
-        echo "30" >&3
-
-        local services=("zfs-import" "zfs-load-key" "zfs-share" "zfs-zed" "zfs-mount")
-        local current=40
-        local step=10
-
-        for service in "${services[@]}"; do
-            debug $DEBUG_INFO "Adding $service service to boot"
-            echo "Adding $service service to boot..." >&3
-            if ! rc-update add "$service" boot >/dev/null 2>&4; then
-                debug $DEBUG_ERROR "Failed to add $service service to boot"
-                exec 1>&3 2>&4
-                error "Failed to add $service service to boot!"
-            fi
-            echo "$current" >&3
-            ((current += step))
-        done
-        debug $DEBUG_INFO "ZFS services configuration completed successfully"
-    ) | dialog --gauge "Configuring ZFS services..." 10 70 0 >&3
-
-    printf "%s\n" "${bold}ZFS services configured successfully!"
     
     exec 1>&3 2>&4 3>&- 4>&-
 }
@@ -311,16 +252,9 @@ regenerate_initcpio() {
 configure_bootloader() {
     debug $DEBUG_INFO "Configuring bootloader"
     detect_root_filesystem
-    
-    if [[ "$ROOT_FS" == "zfs" ]]; then
-        install_zfsbootmenu && zfsservice && regenerate_initcpio || {
-            error "Error installing ZFSBootMenu!"
-        }
-    else
-        install_grub && regenerate_initcpio || {
-            error "Error installing GRUB!"
-        }
-    fi
+    install_grub && regenerate_initcpio || {
+        error "Error installing GRUB!"
+    }
 }
 
 addlocales() {

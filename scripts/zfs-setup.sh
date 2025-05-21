@@ -15,7 +15,7 @@ rootpool() {
         echo "Creating ZFS root pool..."; sleep 1
         zgenhostid -f
         debug $DEBUG_DEBUG "Running zpool create command"
-        zpool create -f -o ashift=12 -o autotrim=on \
+        zpool create -f -o ashift=12 -o autotrim=on -o compatibility=openzfs-2.1-linux \
             -O acltype=posixacl -O xattr=sa -O relatime=on -O compression=lz4 -m none \
             -R $INST_MNT "$ZFS_POOL_NAME" "${DISK}-part2" >> "$LOG_FILE" 2>&1 && echo "50"
         
@@ -62,11 +62,6 @@ createdatasets() {
         debug $DEBUG_ERROR "Failed to create ZFS datasets"
         error "Error creating the datasets!"
     fi
-
-    # Set properties for the datasets
-    debug $DEBUG_DEBUG "Setting properties for zfsbootmenu"
-    zfs set org.zfsbootmenu:bootfs="$ZFS_POOL_NAME/os/artix" "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1 || error "Failed to set bootfs property!"    
-
     debug $DEBUG_INFO "Datasets created successfully"
     printf "%s\n" "${bold}Datasets created successfully!"
 }
@@ -98,7 +93,6 @@ mountall() {
     # Setting cachefile and zgenhostid files
     debug $DEBUG_DEBUG "Setting cachefile and zgenhostid files"
     zpool set cachefile=/etc/zfs/zpool.cache "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1 || error "Failed to set cachefile property!"
-    zfs set org.zfsbootmenu:commandline="quiet loglevel=4" "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1 || error "Failed to set commandline property!"
     mkdir -p "$INST_MNT/etc/zfs" >> "$LOG_FILE" 2>&1 || error "Failed to create /etc/zfs directory!"
     cp /etc/zfs/zpool.cache "$INST_MNT/etc/zfs/zpool.cache" >> "$LOG_FILE" 2>&1 || error "Failed to copy zpool.cache file!"
     cp /etc/hostid "$INST_MNT/etc/hostid" >> "$LOG_FILE" 2>&1 || error "Failed to copy hostid file!"
