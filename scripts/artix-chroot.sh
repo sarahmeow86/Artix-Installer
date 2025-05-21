@@ -12,6 +12,16 @@ bold=$(tput setaf 2 bold)      # makes text bold and sets color to 2
 bolderror=$(tput setaf 3 bold) # makes text bold and sets color to 3
 normal=$(tput sgr0)            # resets text settings back to normal
 
+# Save original file descriptors
+exec 3>&1
+exec 4>&2
+
+# Add function to restore descriptors
+restore_descriptors() {
+    exec 1>&3
+    exec 2>&4
+}
+
 # Debug function
 debug() {
     local level=$1
@@ -39,21 +49,19 @@ debug() {
 
 error() {
     debug $DEBUG_ERROR "$1"
+    restore_descriptors
     printf "%s\n" "${bolderror}ERROR:${normal}\\n%s\\n" "$1" >&2
     exit 1
 }
 
 select_desktop_environment() {
     debug $DEBUG_INFO "Starting desktop environment selection"
-    # Save original descriptors
-    exec 3>&1
-    exec 4>&2
-
+    
     # Create temporary file for dialog output
     temp_choice=$(mktemp)
     debug $DEBUG_DEBUG "Created temporary choice file: $temp_choice"
 
-    # Display dialog menu
+    # Display dialog menu - using saved descriptors
     dialog --clear --title "Desktop Environment Selection" \
         --menu "Choose a desktop environment to install:" 15 60 6 \
         1 "Base (No Desktop Environment)" \
@@ -94,7 +102,7 @@ select_desktop_environment() {
             DE="xfce"
             ;;
         *) 
-            exec 1>&3 2>&4
+            restore_descriptors
             error "Invalid choice or no selection made!"
             ;;
     esac
@@ -112,19 +120,15 @@ select_desktop_environment() {
                 echo "100" >&3
             else
                 debug $DEBUG_ERROR "Package installation failed"
-                exec 1>&3 2>&4
+                restore_descriptors
                 error "Failed to install packages!"
             fi
         ) | dialog --gauge "Installing $DE packages..." 10 70 0 >&3
     else
         debug $DEBUG_ERROR "Package list not found: /install/$PKGLIST"
-        exec 1>&3 2>&4
+        restore_descriptors
         error "Package list file not found!"
     fi
-
-    # Restore original descriptors
-    exec 1>&3 2>&4
-    exec 3>&- 4>&-
 
     printf "%s\n" "${bold}Desktop environment $DE installed successfully!"
     export DE
@@ -155,7 +159,6 @@ detect_root_filesystem() {
 
 install_grub() {
     debug $DEBUG_INFO "Starting GRUB installation"
-    exec 3>&1 4>&2
     
     # Get ZFS pool name from mounted system
     if [[ "$ROOT_FS" == "zfs" ]]; then
@@ -175,7 +178,7 @@ install_grub() {
         echo "Installing GRUB and related packages..." >&3
         if ! pacman -S --noconfirm grub os-prober efibootmgr >/dev/null 2>&4; then
             debug $DEBUG_ERROR "Failed to install GRUB packages"
-            exec 1>&3 2>&4
+            restore_descriptors
             error "Failed to install GRUB packages!"
         fi
         echo "40" >&3
@@ -187,7 +190,7 @@ install_grub() {
             sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"root=ZFS=${ZFS_POOL_NAME}/os/artix quiet\"|" \
                 /etc/default/grub >/dev/null 2>&4 || {
                 debug $DEBUG_ERROR "Failed to configure GRUB defaults"
-                exec 1>&3 2>&4
+                restore_descriptors
                 error "Failed to configure GRUB for ZFS!"
             }
         fi
@@ -197,7 +200,7 @@ install_grub() {
         echo "Installing GRUB to EFI system partition..." >&3
         if ! grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB --force >/dev/null 2>&4; then
             debug $DEBUG_ERROR "Failed to install GRUB to EFI partition"
-            exec 1>&3 2>&4
+            restore_descriptors
             error "Failed to install GRUB!"
         fi
         echo "80" >&3
@@ -206,7 +209,7 @@ install_grub() {
         echo "Generating GRUB configuration file..." >&3
         if ! grub-mkconfig -o /boot/grub/grub.cfg >/dev/null 2>&4; then
             debug $DEBUG_ERROR "Failed to generate GRUB configuration"
-            exec 1>&3 2>&4
+            restore_descriptors
             error "Failed to generate GRUB configuration!"
         fi
         echo "100" >&3
@@ -214,13 +217,10 @@ install_grub() {
     ) | dialog --gauge "Installing GRUB bootloader..." 10 70 0 >&3
 
     dialog --msgbox "GRUB has been installed and configured successfully!" 10 50 >&3
-    
-    exec 1>&3 2>&4 3>&- 4>&-
 }
 
 regenerate_initcpio() {
     debug $DEBUG_INFO "Regenerating initramfs"
-    exec 3>&1 4>&2
     
     (
         echo "10" >&3; sleep 1
@@ -228,7 +228,7 @@ regenerate_initcpio() {
         echo "Backing up existing initramfs..." >&3
         if ! cp /boot/initramfs-linux.img /boot/initramfs-linux.img.bak >/dev/null 2>&4; then
             debug $DEBUG_ERROR "Failed to back up existing initramfs"
-            exec 1>&3 2>&4
+            restore_descriptors
             error "Failed to back up existing initramfs!"
         fi
         echo "30" >&3
@@ -237,7 +237,7 @@ regenerate_initcpio() {
         echo "Regenerating initramfs..." >&3
         if ! mkinitcpio -P >/dev/null 2>&4; then
             debug $DEBUG_ERROR "Failed to regenerate initramfs"
-            exec 1>&3 2>&4
+            restore_descriptors
             error "Failed to regenerate initramfs!"
         fi
         echo "100" >&3
@@ -245,8 +245,6 @@ regenerate_initcpio() {
     ) | dialog --gauge "Regenerating initramfs..." 10 70 0 >&3
 
     printf "%s\n" "${bold}Initramfs regenerated successfully!"
-    
-    exec 1>&3 2>&4 3>&- 4>&-
 }
 
 configure_bootloader() {
@@ -259,7 +257,6 @@ configure_bootloader() {
 
 addlocales() {
     debug $DEBUG_INFO "Adding locales"
-    exec 3>&1 4>&2
     
     locale_list=$(grep -v '^$' /install/locale.gen | awk '{print $1}' | sort)
     dialog_options=()
@@ -273,7 +270,6 @@ addlocales() {
 
     if [[ -z "$alocale" ]]; then
         printf "%s\n" "No locale selected. Skipping locale configuration."
-        exec 1>&3 2>&4 3>&- 4>&-
         return 0
     fi
 
@@ -281,46 +277,40 @@ addlocales() {
     sed -i "s/^#\s*\($alocale\)/\1/" /etc/locale.gen >/dev/null 2>&4
     if ! locale-gen >/dev/null 2>&4; then
         debug $DEBUG_ERROR "Failed to generate locale"
-        exec 1>&3 2>&4
+        restore_descriptors
         error "Failed to generate locale!"
     fi
 
     printf "%s\n" "${bold}Locale '$alocale' has been added and generated successfully!"
-    
-    exec 1>&3 2>&4 3>&- 4>&-
 }
 
 setlocale() {
     debug $DEBUG_INFO "Setting locale to $alocale"
-    exec 3>&1 4>&2
     
     printf "%s\n" "${bold}Setting locale to $alocale"
     if ! echo "LANG=$alocale" > /etc/locale.conf >/dev/null 2>&4; then
         debug $DEBUG_ERROR "Failed to set locale"
-        exec 1>&3 2>&4
+        restore_descriptors
         error "Cannot set locale!"
     fi
-    
-    exec 1>&3 2>&4 3>&- 4>&-
 }
 
 USERADD() {
     debug $DEBUG_INFO "Creating user account"
-    exec 3>&1 4>&2
     
     username=$(dialog --clear --title "Create User Account" \
         --inputbox "Enter the non-root username:" 10 50 2>&1 1>&3)
 
     if [[ -z "$username" ]]; then
         debug $DEBUG_ERROR "No username provided"
-        exec 1>&3 2>&4
+        restore_descriptors
         error "No username provided!"
     fi
 
     debug $DEBUG_INFO "Adding user $username"
     if ! useradd -m -G audio,video,wheel "$username" >/dev/null 2>&4; then
         debug $DEBUG_ERROR "Failed to add user $username"
-        exec 1>&3 2>&4
+        restore_descriptors
         error "Failed to add user $username"
     fi
 
@@ -329,32 +319,29 @@ USERADD() {
 
     if [[ -z "$password" ]]; then
         debug $DEBUG_ERROR "No password provided"
-        exec 1>&3 2>&4
+        restore_descriptors
         error "No password provided!"
     fi
 
     debug $DEBUG_INFO "Setting password for user $username"
     if ! echo "$username:$password" | chpasswd >/dev/null 2>&4; then
         debug $DEBUG_ERROR "Failed to set password for $username"
-        exec 1>&3 2>&4
+        restore_descriptors
         error "Failed to set password for $username"
     fi
 
     printf "%s\n" "${bold}User $username has been created successfully!"
-    
-    exec 1>&3 2>&4 3>&- 4>&-
 }
 
 passwdroot() {
     debug $DEBUG_INFO "Setting root password"
-    exec 3>&1 4>&2
     
     rootpass=$(dialog --clear --title "Set Root Password" \
         --passwordbox "Enter the password for root:" 10 50 2>&1 1>&3)
 
     if [[ -z "$rootpass" ]]; then
         debug $DEBUG_ERROR "No root password provided"
-        exec 1>&3 2>&4
+        restore_descriptors
         error "No root password provided!"
     fi
 
@@ -363,32 +350,29 @@ passwdroot() {
 
     if [[ "$rootpass" != "$rootpass_confirm" ]]; then
         debug $DEBUG_ERROR "Root passwords do not match"
-        exec 1>&3 2>&4
+        restore_descriptors
         error "Passwords do not match!"
     fi
 
     debug $DEBUG_INFO "Setting root password"
     if ! echo "root:$rootpass" | chpasswd >/dev/null 2>&4; then
         debug $DEBUG_ERROR "Failed to set root password"
-        exec 1>&3 2>&4
+        restore_descriptors
         error "Failed to set root password"
     fi
 
     printf "%s\n" "${bold}Root password has been set successfully!"
-    
-    exec 1>&3 2>&4 3>&- 4>&-
 }
 
 enable_boot_services() {
     debug $DEBUG_INFO "Starting boot services configuration"
-    exec 3>&1 4>&2
     
     local boot_services_file="/install/services/boot-runtime-${DE}.txt"
     debug $DEBUG_DEBUG "Using boot services file: $boot_services_file"
 
     if [[ ! -f "$boot_services_file" ]]; then
         debug $DEBUG_ERROR "Boot services file not found: $boot_services_file"
-        exec 1>&3 2>&4
+        restore_descriptors
         error "Boot services file not found: $boot_services_file"
     fi
 
@@ -409,26 +393,24 @@ enable_boot_services() {
         debug $DEBUG_INFO "Enabling service $service in boot runlevel"
         if ! rc-update add "$service" boot >/dev/null 2>&4; then
             debug $DEBUG_ERROR "Failed to enable service: $service"
-            exec 1>&3 2>&4
+            restore_descriptors
             error "Failed to enable service: $service"
         fi
         debug $DEBUG_INFO "Successfully enabled service: $service"
     done < "$boot_services_file"
     
     debug $DEBUG_INFO "Boot services configuration completed"
-    exec 1>&3 2>&4 3>&- 4>&-
 }
 
 enable_default_services() {
     debug $DEBUG_INFO "Starting default services configuration"
-    exec 3>&1 4>&2
     
     local default_services_file="/install/services/default-runtime-${DE}.txt"
     debug $DEBUG_DEBUG "Using default services file: $default_services_file"
 
     if [[ ! -f "$default_services_file" ]]; then
         debug $DEBUG_ERROR "Default services file not found: $default_services_file"
-        exec 1>&3 2>&4
+        restore_descriptors
         error "Default services file not found: $default_services_file"
     fi
 
@@ -449,19 +431,17 @@ enable_default_services() {
         debug $DEBUG_INFO "Enabling service $service in default runlevel"
         if ! rc-update add "$service" default >/dev/null 2>&4; then
             debug $DEBUG_ERROR "Failed to enable service: $service"
-            exec 1>&3 2>&4
+            restore_descriptors
             error "Failed to enable service: $service"
         fi
         debug $DEBUG_INFO "Successfully enabled service: $service"
     done < "$default_services_file"
     
     debug $DEBUG_INFO "Default services configuration completed"
-    exec 1>&3 2>&4 3>&- 4>&-
 }
 
 enableservices() {
     debug $DEBUG_INFO "Starting services configuration for $DE"
-    exec 3>&1 4>&2
     
     printf "%s\n" "${bold}Enabling services for ${DE}"
 
@@ -482,7 +462,7 @@ enableservices() {
         echo "Verifying services..." >&3; sleep 1
         if ! rc-update show >/dev/null 2>&4; then
             debug $DEBUG_ERROR "Service verification failed"
-            exec 1>&3 2>&4
+            restore_descriptors
             error "Failed to verify services!"
         fi
         echo "100" >&3
@@ -490,13 +470,10 @@ enableservices() {
     ) | dialog --gauge "Enabling system services..." 10 70 0 >&3
 
     printf "%s\n" "${bold}Services enabled successfully!"
-    
-    exec 1>&3 2>&4 3>&- 4>&-
 }
 
 main() {
     debug $DEBUG_INFO "Starting main installation process"
-    exec 3>&1 4>&2
     
     select_desktop_environment || error "Error selecting desktop environment!"
     addlocales || error "Cannot generate locales"
@@ -510,9 +487,11 @@ main() {
     dialog --title "Installation Complete" --msgbox "\
 ${bold}Finish!${normal}\n\n\
 The installation process has been completed successfully." 10 50 >&3
-
-    exec 1>&3 2>&4 3>&- 4>&-
 }
 
 debug $DEBUG_INFO "Script initialization complete"
 main
+
+# Restore original descriptors at end of script
+restore_descriptors
+exec 3>&- 4>&-
