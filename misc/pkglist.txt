@@ -26,6 +26,7 @@ dhcpcd
 dhcpcd-openrc
 dialog
 diffutils
+dkms
 duktape
 e2fsprogs
 efibootmgr
