@@ -1,4 +1,39 @@
 #!/usr/bin/env bash
+
+check_existing_pools() {
+    debug $DEBUG_INFO "Checking for existing ZFS pools"
+    
+    # Get list of importable pools
+    local discovered_pools=$(zpool import | grep "pool:" | cut -d: -f2 | tr -d ' ')
+    
+    if [[ -n "$discovered_pools" ]]; then
+        debug $DEBUG_DEBUG "Found existing pools: $discovered_pools"
+        if dialog --title "Existing ZFS Pools" \
+            --yesno "Found existing ZFS pools:\n\n$discovered_pools\n\nDo you want to import them into the new system?" 12 60; then
+            
+            debug $DEBUG_INFO "User chose to import existing pools"
+            for pool in $discovered_pools; do
+                [[ "$pool" == "$ZFS_POOL_NAME" ]] && continue
+                debug $DEBUG_DEBUG "Importing pool: $pool to $INST_MNT"
+                if ! zpool import -R "$INST_MNT" -N "$pool" >> "$LOG_FILE" 2>&1; then
+                    debug $DEBUG_ERROR "Failed to import pool: $pool"
+                    error "Failed to import pool: $pool"
+                fi
+                debug $DEBUG_DEBUG "Mounting datasets for pool: $pool"
+                if ! zfs mount -a -l >> "$LOG_FILE" 2>&1; then
+                    debug $DEBUG_ERROR "Failed to mount datasets for pool: $pool"
+                    error "Failed to mount datasets for pool: $pool"
+                fi
+                debug $DEBUG_INFO "Successfully imported and mounted pool: $pool"
+            done
+        else
+            debug $DEBUG_INFO "User chose not to import existing pools"
+        fi
+    else
+        debug $DEBUG_DEBUG "No existing pools found"
+    fi
+}
+
 rootpool() {
     debug $DEBUG_INFO "Starting ZFS root pool creation"
     printf "%s\n" "${bold}Creating root pool"
@@ -30,6 +65,9 @@ rootpool() {
         debug $DEBUG_ERROR "Failed to create ZFS root pool"
         error "Error setting up the root pool!"
     fi
+
+    # Check for other pools to import after root pool is set up
+    check_existing_pools
 
     debug $DEBUG_INFO "Root pool created successfully"
     printf "%s\n" "${bold}Root pool created successfully!"
