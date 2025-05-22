@@ -412,8 +412,7 @@ done
 if [[ $FILESYSTEM == "zfs" ]]; then
     if [[ -z "$ZFS_POOL_NAME" ]]; then
         # Generate UUID and set pool name if none provided
-        INST_UUID=$(dd if=/dev/urandom of=/dev/stdout bs=1 count=100 2>/dev/null | tr -dc 'a-z0-9' | cut -c-6)
-        ZFS_POOL_NAME="rpool_$INST_UUID"
+        ZFS_POOL_NAME="tank"
         debug $DEBUG_INFO "Generated ZFS pool name: $ZFS_POOL_NAME"
     else
         INST_UUID="" # Clear UUID when using custom pool name
