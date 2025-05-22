@@ -213,6 +213,20 @@ validate_swap_size() {
     return 0
 }
 
+validate_kernel() {
+    local valid_kernels=("linux" "linux-zen" "linux-lts")
+    local kernel="$1"
+
+    for valid_kernel in "${valid_kernels[@]}"; do
+        if [[ "$kernel" == "$valid_kernel" ]]; then
+            return 0
+        fi
+    done
+
+    debug $DEBUG_ERROR "Invalid kernel: $kernel"
+    return 1
+}
+
 # Show help information
 show_help() {
     cat << EOF
@@ -227,14 +241,15 @@ Options:
                            0: Off, 1: Error, 2: Warning, 3: Info, 4: Debug
     -d, --disk DEVICE      Specify the installation disk device (must use /dev/disk/by-id/ format)
     -f, --filesystem FS    Specify filesystem type (ext4, btrfs, zfs, xfs)
+    -k, --kernel KERNEL    Specify kernel to install (linux, linux-zen, linux-lts)
     -p, --pool-name NAME   Specify ZFS pool name (forces ZFS filesystem)
     -t, --timezone ZONE    Specify timezone (e.g., "Europe/Rome")
     -H, --hostname NAME    Specify system hostname
     -s, --swap-size SIZE   Specify swap partition size in GB (must be positive integer)
 
 Examples:
-    $0 -D 4 -d /dev/disk/by-id/ata-SanDisk_SSD_PLUS_120GB_123456 -f ext4 -s 8
-    $0 --filesystem zfs --pool-name mypool --swap-size 16
+    $0 -D 4 -d /dev/disk/by-id/ata-SanDisk_SSD_PLUS_120GB_123456 -f ext4 -k linux-zen -s 8
+    $0 --filesystem zfs --pool-name mypool --kernel linux-lts --swap-size 16
 EOF
     exit 0
 }
@@ -375,6 +390,18 @@ while [[ $# -gt 0 ]]; do
                 error "Swap size argument required"
             fi
             ;;
+        -k|--kernel)
+            if [[ -n "$2" ]]; then
+                if validate_kernel "$2"; then
+                    INST_LINVAR="$2"
+                else
+                    error "Invalid kernel: $2. Valid options are: linux, linux-zen, linux-lts"
+                fi
+                shift 2
+            else
+                error "Kernel argument required"
+            fi
+            ;;
         *)
             error "Unknown option: $1"
             ;;
@@ -418,7 +445,11 @@ perform_installation() {
 
     # Configure installation variables
     debug $DEBUG_INFO "Configuring installation variables"
-    local var_steps=("installkrn")
+    local var_steps=()
+    # Only add kernel selection if no kernel was specified
+    if [[ -z "$INST_LINVAR" ]]; then
+        var_steps+=("installkrn")
+    fi
     # Only add hostname selection if no hostname was specified
     if [[ -z "$HOSTNAME" ]]; then
         var_steps+=("installhost")
