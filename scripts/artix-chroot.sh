@@ -402,7 +402,7 @@ enable_boot_services() {
         if [[ -f "/etc/init.d/$service" ]]; then
             if [[ ! -L "/etc/runlevels/boot/$service" ]]; then
                 debug $DEBUG_INFO "Creating symlink for $service in boot runlevel"
-                ln -s "/etc/init.d/$service" "/etc/runlevels/boot/$service" || {
+                ln -sf "/etc/init.d/$service" "/etc/runlevels/boot/$service" || {
                     debug $DEBUG_ERROR "Failed to create symlink for service: $service"
                     error "Failed to enable service: $service in boot"
                 }
@@ -439,7 +439,7 @@ enable_default_services() {
         if [[ -f "/etc/init.d/$service" ]]; then
             if [[ ! -L "/etc/runlevels/default/$service" ]]; then
                 debug $DEBUG_INFO "Creating symlink for $service in default runlevel"
-                ln -s "/etc/init.d/$service" "/etc/runlevels/default/$service" || {
+                ln -sf "/etc/init.d/$service" "/etc/runlevels/default/$service" || {
                     debug $DEBUG_ERROR "Failed to create symlink for service: $service"
                     error "Failed to enable service: $service in default"
                 }
