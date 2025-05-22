@@ -386,35 +386,30 @@ enable_boot_services() {
 
     if [[ ! -f "$boot_services_file" ]]; then
         debug $DEBUG_ERROR "Boot services file not found: $boot_services_file"
-        return 1
+        error "Boot services file not found: $boot_services_file"
     fi
 
-    local failed=0
     while IFS= read -r service; do
         [[ -z "$service" || "$service" =~ ^# ]] && continue
         
         debug $DEBUG_DEBUG "Processing service: $service"
-        if ! rc-service --exists "$service"; then
-            debug $DEBUG_WARN "Service $service does not exist, skipping"
-            continue
-        fi
-
-        if rc-update show boot | grep -q "^[[:space:]]*$service\$"; then
-            debug $DEBUG_DEBUG "Service $service already enabled in boot runlevel"
-            continue
-        fi
-
-        debug $DEBUG_INFO "Enabling service $service in boot runlevel"
-        if ! rc-update add "$service" boot; then
-            debug $DEBUG_ERROR "Failed to enable service: $service"
-            failed=1
+        if rc-service --exists "$service"; then
+            if ! rc-update show boot | grep -q "^[[:space:]]*$service\$"; then
+                debug $DEBUG_INFO "Enabling service $service in boot runlevel"
+                rc-update add "$service" boot || {
+                    debug $DEBUG_ERROR "Failed to enable service: $service"
+                    error "Failed to enable service: $service in boot"
+                }
+                debug $DEBUG_INFO "Successfully enabled service: $service"
+            else
+                debug $DEBUG_DEBUG "Service $service already enabled in boot runlevel"
+            fi
         else
-            debug $DEBUG_INFO "Successfully enabled service: $service"
+            debug $DEBUG_WARN "Service $service does not exist, skipping"
         fi
     done < "$boot_services_file"
     
     debug $DEBUG_INFO "Boot services configuration completed"
-    return $failed
 }
 
 enable_default_services() {
@@ -425,35 +420,30 @@ enable_default_services() {
 
     if [[ ! -f "$default_services_file" ]]; then
         debug $DEBUG_ERROR "Default services file not found: $default_services_file"
-        return 1
+        error "Default services file not found: $default_services_file"
     fi
 
-    local failed=0
     while IFS= read -r service; do
         [[ -z "$service" || "$service" =~ ^# ]] && continue
         
         debug $DEBUG_DEBUG "Processing service: $service"
-        if ! rc-service --exists "$service"; then
-            debug $DEBUG_WARN "Service $service does not exist, skipping"
-            continue
-        fi
-
-        if rc-update show default | grep -q "^[[:space:]]*$service\$"; then
-            debug $DEBUG_DEBUG "Service $service already enabled in default runlevel"
-            continue
-        fi
-
-        debug $DEBUG_INFO "Enabling service $service in default runlevel"
-        if ! rc-update add "$service" default; then
-            debug $DEBUG_ERROR "Failed to enable service: $service"
-            failed=1
+        if rc-service --exists "$service"; then
+            if ! rc-update show default | grep -q "^[[:space:]]*$service\$"; then
+                debug $DEBUG_INFO "Enabling service $service in default runlevel"
+                rc-update add "$service" default || {
+                    debug $DEBUG_ERROR "Failed to enable service: $service"
+                    error "Failed to enable service: $service in default"
+                }
+                debug $DEBUG_INFO "Successfully enabled service: $service"
+            else
+                debug $DEBUG_DEBUG "Service $service already enabled in default runlevel"
+            fi
         else
-            debug $DEBUG_INFO "Successfully enabled service: $service"
+            debug $DEBUG_WARN "Service $service does not exist, skipping"
         fi
     done < "$default_services_file"
     
     debug $DEBUG_INFO "Default services configuration completed"
-    return $failed
 }
 
 enableservices() {
