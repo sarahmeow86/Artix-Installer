@@ -22,6 +22,10 @@ installpkgs() {
                 misc/zfs-openrc-*.pkg.tar.zst >> "$LOG_FILE" 2>&1 && echo "90"
         fi
         
+        echo "Updating system packages..."; sleep 1
+        debug $DEBUG_DEBUG "Running system update in chroot"
+        artix-chroot $INST_MNT /bin/bash -c "pacman -Syu --noconfirm" >> "$LOG_FILE" 2>&1 && echo "95"
+        
         echo "Copying pacman configuration..."; sleep 1
         debug $DEBUG_DEBUG "Copying pacman configuration files"
         rm -rf $INST_MNT/etc/pacman.d >> "$LOG_FILE" 2>&1
