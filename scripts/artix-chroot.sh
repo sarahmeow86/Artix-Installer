@@ -213,6 +213,20 @@ install_grub() {
             error "Failed to generate GRUB configuration!"
         fi
         echo "100" >&3
+
+        if [[ "$ROOT_FS" == "zfs" ]]; then
+            debug $DEBUG_INFO "Enabling ZFS services"
+            echo "Enabling ZFS services..." >&3
+            for service in zfs-import zfs-mount zfs-share zfs-zed zfs-load-key; do
+                if ! rc-update add "$service" boot >/dev/null 2>&4; then
+                    debug $DEBUG_ERROR "Failed to enable $service"
+                    restore_descriptors
+                    error "Failed to enable ZFS service: $service"
+                fi
+                debug $DEBUG_INFO "Enabled $service service"
+            done
+        fi
+
         debug $DEBUG_INFO "GRUB installation completed successfully"
     ) | dialog --gauge "Installing GRUB bootloader..." 10 70 0 >&3
 
