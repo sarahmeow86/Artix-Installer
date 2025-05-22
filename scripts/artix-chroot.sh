@@ -217,17 +217,20 @@ install_grub() {
         if [[ "$ROOT_FS" == "zfs" ]]; then
             debug $DEBUG_INFO "Enabling ZFS services"
             echo "Enabling ZFS services..." >&3
+            mkdir -p /etc/runlevels/boot
             for service in zfs-import zfs-mount zfs-share zfs-zed zfs-load-key; do
-                if ! rc-update add "$service" boot >/dev/null 2>&4; then
-                    debug $DEBUG_ERROR "Failed to enable $service"
-                    restore_descriptors
-                    error "Failed to enable ZFS service: $service"
+                if [[ -f "/etc/init.d/$service" ]]; then
+                    ln -sf "/etc/init.d/$service" "/etc/runlevels/boot/$service" || {
+                        debug $DEBUG_ERROR "Failed to create symlink for service: $service"
+                        restore_descriptors
+                        error "Failed to enable ZFS service: $service"
+                    }
+                    debug $DEBUG_INFO "Enabled $service service"
+                else
+                    debug $DEBUG_WARN "ZFS service $service not found in /etc/init.d"
                 fi
-                debug $DEBUG_INFO "Enabled $service service"
             done
         fi
-
-        debug $DEBUG_INFO "GRUB installation completed successfully"
     ) | dialog --gauge "Installing GRUB bootloader..." 10 70 0 >&3
 
     dialog --msgbox "GRUB has been installed and configured successfully!" 10 50 >&3
@@ -389,15 +392,18 @@ enable_boot_services() {
         error "Boot services file not found: $boot_services_file"
     fi
 
+    # Ensure boot runlevel directory exists
+    mkdir -p /etc/runlevels/boot
+
     while IFS= read -r service; do
         [[ -z "$service" || "$service" =~ ^# ]] && continue
         
         debug $DEBUG_DEBUG "Processing service: $service"
-        if rc-service --exists "$service"; then
-            if ! rc-update show boot | grep -q "^[[:space:]]*$service\$"; then
-                debug $DEBUG_INFO "Enabling service $service in boot runlevel"
-                rc-update add "$service" boot || {
-                    debug $DEBUG_ERROR "Failed to enable service: $service"
+        if [[ -f "/etc/init.d/$service" ]]; then
+            if [[ ! -L "/etc/runlevels/boot/$service" ]]; then
+                debug $DEBUG_INFO "Creating symlink for $service in boot runlevel"
+                ln -s "/etc/init.d/$service" "/etc/runlevels/boot/$service" || {
+                    debug $DEBUG_ERROR "Failed to create symlink for service: $service"
                     error "Failed to enable service: $service in boot"
                 }
                 debug $DEBUG_INFO "Successfully enabled service: $service"
@@ -405,7 +411,7 @@ enable_boot_services() {
                 debug $DEBUG_DEBUG "Service $service already enabled in boot runlevel"
             fi
         else
-            debug $DEBUG_WARN "Service $service does not exist, skipping"
+            debug $DEBUG_WARN "Service $service does not exist in /etc/init.d, skipping"
         fi
     done < "$boot_services_file"
     
@@ -423,15 +429,18 @@ enable_default_services() {
         error "Default services file not found: $default_services_file"
     fi
 
+    # Ensure default runlevel directory exists
+    mkdir -p /etc/runlevels/default
+
     while IFS= read -r service; do
         [[ -z "$service" || "$service" =~ ^# ]] && continue
         
         debug $DEBUG_DEBUG "Processing service: $service"
-        if rc-service --exists "$service"; then
-            if ! rc-update show default | grep -q "^[[:space:]]*$service\$"; then
-                debug $DEBUG_INFO "Enabling service $service in default runlevel"
-                rc-update add "$service" default || {
-                    debug $DEBUG_ERROR "Failed to enable service: $service"
+        if [[ -f "/etc/init.d/$service" ]]; then
+            if [[ ! -L "/etc/runlevels/default/$service" ]]; then
+                debug $DEBUG_INFO "Creating symlink for $service in default runlevel"
+                ln -s "/etc/init.d/$service" "/etc/runlevels/default/$service" || {
+                    debug $DEBUG_ERROR "Failed to create symlink for service: $service"
                     error "Failed to enable service: $service in default"
                 }
                 debug $DEBUG_INFO "Successfully enabled service: $service"
@@ -439,7 +448,7 @@ enable_default_services() {
                 debug $DEBUG_DEBUG "Service $service already enabled in default runlevel"
             fi
         else
-            debug $DEBUG_WARN "Service $service does not exist, skipping"
+            debug $DEBUG_WARN "Service $service does not exist in /etc/init.d, skipping"
         fi
     done < "$default_services_file"
     
