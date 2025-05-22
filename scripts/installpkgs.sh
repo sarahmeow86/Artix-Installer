@@ -19,6 +19,7 @@ installpkgs() {
             echo "Installing ZFS packages..."; sleep 1
             debug $DEBUG_DEBUG "Installing ZFS packages from misc directory"
             basestrap $INST_MNT zfs-dkms-git zfs-utils-git
+            debug $DEBUG_DEBUG "Installing ZFS OpenRC package"
             basestrap -U $INST_MNT misc/zfs-openrc-*.pkg.tar.zst >> "$LOG_FILE" 2>&1 && echo "90"
         fi
         
