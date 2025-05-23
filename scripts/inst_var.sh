@@ -101,9 +101,9 @@ selectdisk() {
     printf "%s\n" "${bold}## Decide which disk you want to use"
 
     debug $DEBUG_DEBUG "Generating disk list"
-    disk_list=$(ls -1 /dev/disk/by-id)
+    disk_list=$(ls -1 /dev/disk/by-id | grep -v -- "-part[0-9]")
 
-	# Prepare the list for the dialog menu
+    # Prepare the list for the dialog menu
     dialog_options=()
     for disk in $disk_list; do
         dialog_options+=("$disk" "Disk")
