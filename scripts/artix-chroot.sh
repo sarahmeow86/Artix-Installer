@@ -381,78 +381,35 @@ passwdroot() {
     printf "%s\n" "${bold}Root password has been set successfully!"
 }
 
-enable_boot_services() {
-    debug $DEBUG_INFO "Starting boot services configuration"
+enable_services() {
+    debug $DEBUG_INFO "Starting services configuration"
     
-    local boot_services_file="/install/services/boot-runtime-${DE}.txt"
-    debug $DEBUG_DEBUG "Using boot services file: $boot_services_file"
-
-    if [[ ! -f "$boot_services_file" ]]; then
-        debug $DEBUG_ERROR "Boot services file not found: $boot_services_file"
-        error "Boot services file not found: $boot_services_file"
-    fi
-
-    # Ensure boot runlevel directory exists
-    mkdir -p /etc/runlevels/boot
-
-    while IFS= read -r service; do
-        [[ -z "$service" || "$service" =~ ^# ]] && continue
-        
-        debug $DEBUG_DEBUG "Processing service: $service"
-        if [[ -f "/etc/init.d/$service" ]]; then
-            if [[ ! -L "/etc/runlevels/boot/$service" ]]; then
-                debug $DEBUG_INFO "Creating symlink for $service in boot runlevel"
-                ln -sf "/etc/init.d/$service" "/etc/runlevels/boot/$service" || {
-                    debug $DEBUG_ERROR "Failed to create symlink for service: $service"
-                    error "Failed to enable service: $service in boot"
-                }
-                debug $DEBUG_INFO "Successfully enabled service: $service"
-            else
-                debug $DEBUG_DEBUG "Service $service already enabled in boot runlevel"
-            fi
+    if [[ "$DE" == "none" ]]; then
+        debug $DEBUG_INFO "Base install - enabling NetworkManager only"
+        mkdir -p /etc/runlevels/default
+        if [[ -f "/etc/init.d/NetworkManager" ]]; then
+            ln -sf "/etc/init.d/NetworkManager" "/etc/runlevels/default/NetworkManager" || {
+                debug $DEBUG_ERROR "Failed to enable NetworkManager"
+                error "Failed to enable NetworkManager"
+            }
+            debug $DEBUG_INFO "NetworkManager enabled successfully"
         else
-            debug $DEBUG_WARN "Service $service does not exist in /etc/init.d, skipping"
+            debug $DEBUG_ERROR "NetworkManager service not found"
+            error "NetworkManager service not found in /etc/init.d"
         fi
-    done < "$boot_services_file"
-    
-    debug $DEBUG_INFO "Boot services configuration completed"
-}
-
-enable_default_services() {
-    debug $DEBUG_INFO "Starting default services configuration"
-    
-    local default_services_file="/install/services/default-runtime-${DE}.txt"
-    debug $DEBUG_DEBUG "Using default services file: $default_services_file"
-
-    if [[ ! -f "$default_services_file" ]]; then
-        debug $DEBUG_ERROR "Default services file not found: $default_services_file"
-        error "Default services file not found: $default_services_file"
-    fi
-
-    # Ensure default runlevel directory exists
-    mkdir -p /etc/runlevels/default
-
-    while IFS= read -r service; do
-        [[ -z "$service" || "$service" =~ ^# ]] && continue
-        
-        debug $DEBUG_DEBUG "Processing service: $service"
-        if [[ -f "/etc/init.d/$service" ]]; then
-            if [[ ! -L "/etc/runlevels/default/$service" ]]; then
-                debug $DEBUG_INFO "Creating symlink for $service in default runlevel"
-                ln -sf "/etc/init.d/$service" "/etc/runlevels/default/$service" || {
-                    debug $DEBUG_ERROR "Failed to create symlink for service: $service"
-                    error "Failed to enable service: $service in default"
-                }
-                debug $DEBUG_INFO "Successfully enabled service: $service"
-            else
-                debug $DEBUG_DEBUG "Service $service already enabled in default runlevel"
-            fi
+    else
+        debug $DEBUG_INFO "Extracting service configuration for $DE"
+        if [[ -f "/install/services/$DE-services.tar.gz" ]]; then
+            tar xzf "/install/services/$DE-services.tar.gz" -C /etc || {
+                debug $DEBUG_ERROR "Failed to extract services archive for $DE"
+                error "Failed to extract services configuration"
+            }
+            debug $DEBUG_INFO "Services configuration extracted successfully"
         else
-            debug $DEBUG_WARN "Service $service does not exist in /etc/init.d, skipping"
+            debug $DEBUG_ERROR "Services archive not found for $DE"
+            error "Services archive not found: /install/services/$DE-services.tar.gz"
         fi
-    done < "$default_services_file"
-    
-    debug $DEBUG_INFO "Default services configuration completed"
+    fi
 }
 
 enableservices() {
@@ -463,19 +420,11 @@ enableservices() {
     (
         echo "5" >&3; sleep 1
         
-        debug $DEBUG_INFO "Configuring boot services"
-        echo "Enabling boot services..." >&3
-        if ! enable_boot_services; then
+        debug $DEBUG_INFO "Configuring services"
+        echo "Enabling services..." >&3
+        if ! enable_services; then
             restore_descriptors
-            error "Failed to enable boot services"
-        fi
-        echo "40" >&3
-
-        debug $DEBUG_INFO "Configuring default services"
-        echo "Enabling default services..." >&3
-        if ! enable_default_services; then
-            restore_descriptors
-            error "Failed to enable default services"
+            error "Failed to enable services"
         fi
         echo "70" >&3
 

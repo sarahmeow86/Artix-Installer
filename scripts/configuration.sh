@@ -139,9 +139,7 @@ prepare_chroot() {
         cp misc/locale.gen $INST_MNT/install/ >> "$LOG_FILE" 2>&1 || error "Failed to copy locale.gen!"
 
         debug $DEBUG_DEBUG "Preparing chroot script with variables"
-        awk -v n=5 -v s="INST_UUID=${INST_UUID}" 'NR == n {print s} {print}' scripts/artix-chroot.sh > scripts/artix-chroot-new.sh 2>> "$LOG_FILE"
-        awk -v n=6 -v s="DISK=${DISK}" 'NR == n {print s} {print}' scripts/artix-chroot-new.sh > scripts/artix-chroot-new2.sh 2>> "$LOG_FILE"
-        rm scripts/artix-chroot-new.sh
+        awk -v n=5 -v s="DISK=${DISK}" 'NR == n {print s} {print}' scripts/artix-chroot.sh > scripts/artix-chroot-new2.sh 2>> "$LOG_FILE"
         mv scripts/artix-chroot-new2.sh $INST_MNT/install/artix-chroot.sh
         chmod +x $INST_MNT/install/artix-chroot.sh >> "$LOG_FILE" 2>&1 && echo "80"
         
