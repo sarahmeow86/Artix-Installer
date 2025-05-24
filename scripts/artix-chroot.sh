@@ -400,7 +400,7 @@ enable_services() {
     else
         debug $DEBUG_INFO "Extracting service configuration for $DE"
         if [[ -f "/install/services/$DE-services.tar.gz" ]]; then
-            tar xzfh "/install/services/$DE-services.tar.gz" -C /etc || {
+            tar xzf "/install/services/$DE-services.tar.gz" -C /etc || {
                 debug $DEBUG_ERROR "Failed to extract services archive for $DE"
                 error "Failed to extract services configuration"
             }
