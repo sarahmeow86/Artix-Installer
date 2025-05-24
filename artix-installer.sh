@@ -467,10 +467,6 @@ perform_installation() {
     # Configure installation variables
     debug $DEBUG_INFO "Configuring installation variables"
     local var_steps=()
-    # Only add locale selection if no locale was specified
-    if [[ -z "$LOCALE" ]]; then
-        var_steps+=("addlocales")
-    fi
     # Only add kernel selection if no kernel was specified
     if [[ -z "$INST_LINVAR" ]]; then
         var_steps+=("installkrn")

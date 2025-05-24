@@ -87,22 +87,28 @@ finishtouch() {
     # Start the progress bar
     (
         echo "10"; sleep 1
-        
-        echo "Selecting locale..."; sleep 1
-        debug $DEBUG_DEBUG "Getting locale list"
-        locale_list=$(grep -v '^$' misc/locale.gen | awk '{print $1}' | sort)
-        dialog_options=()
-        while IFS= read -r locale; do
-            dialog_options+=("$locale" "$locale")
-        done <<< "$locale_list"
 
-        alocale=$(dialog --clear --title "Locale Selection" \
-            --menu "Choose your locale from the list:" 20 70 15 "${dialog_options[@]}" 2>&1 1>&4)
+        if [[ -n "$LOCALE" ]]; then
+            debug $DEBUG_INFO "Using provided locale: $LOCALE"
+            sed -i "s/^#\s*\($LOCALE\)/\1/" $INST_MNT/etc/locale.gen
+            echo "LANG=$LOCALE" > $INST_MNT/etc/locale.conf
+        else
+            echo "Selecting locale..."; sleep 1
+            debug $DEBUG_DEBUG "Getting locale list"
+            locale_list=$(grep -v '^$' misc/locale.gen | awk '{print $1}' | sort)
+            dialog_options=()
+            while IFS= read -r locale; do
+                dialog_options+=("$locale" "$locale")
+            done <<< "$locale_list"
 
-        if [[ -n "$alocale" ]]; then
-            debug $DEBUG_INFO "Setting locale: $alocale"
-            sed -i "s/^#\s*\($alocale\)/\1/" $INST_MNT/etc/locale.gen
-            echo "LANG=$alocale" > $INST_MNT/etc/locale.conf
+            alocale=$(dialog --clear --title "Locale Selection" \
+                --menu "Choose your locale from the list:" 20 70 15 "${dialog_options[@]}" 2>&1 1>&4)
+
+            if [[ -n "$alocale" ]]; then
+                debug $DEBUG_INFO "Setting locale: $alocale"
+                sed -i "s/^#\s*\($alocale\)/\1/" $INST_MNT/etc/locale.gen
+                echo "LANG=$alocale" > $INST_MNT/etc/locale.conf
+            fi
         fi
         echo "30"
 
