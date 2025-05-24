@@ -87,20 +87,38 @@ finishtouch() {
     # Start the progress bar
     (
         echo "10"; sleep 1
+        
+        echo "Selecting locale..."; sleep 1
+        debug $DEBUG_DEBUG "Getting locale list"
+        locale_list=$(grep -v '^$' misc/locale.gen | awk '{print $1}' | sort)
+        dialog_options=()
+        while IFS= read -r locale; do
+            dialog_options+=("$locale" "$locale")
+        done <<< "$locale_list"
+
+        alocale=$(dialog --clear --title "Locale Selection" \
+            --menu "Choose your locale from the list:" 20 70 15 "${dialog_options[@]}" 2>&1 1>&4)
+
+        if [[ -n "$alocale" ]]; then
+            debug $DEBUG_INFO "Setting locale: $alocale"
+            sed -i "s/^#\s*\($alocale\)/\1/" $INST_MNT/etc/locale.gen
+            echo "LANG=$alocale" > $INST_MNT/etc/locale.conf
+        fi
+        echo "30"
+
         echo "Setting hostname..."; sleep 1
         debug $DEBUG_DEBUG "Setting hostname to: $INST_HOST"
-        echo $INST_HOST > $INST_MNT/etc/hostname >> "$LOG_FILE" 2>&1 && echo "20"
+        echo $INST_HOST | tee $INST_MNT/etc/hostname >> "$LOG_FILE" 2>&1 && echo "50"
         
         echo "Setting timezone..."; sleep 1
         debug $DEBUG_DEBUG "Setting timezone to: $INST_TZ"
-        ln -sf $INST_TZ $INST_MNT/etc/localtime >> "$LOG_FILE" 2>&1 && echo "40"
+        ln -sf $INST_MNT/usr/share/zoneinfo/$INST_TZ $INST_MNT/etc/localtime >> "$LOG_FILE" 2>&1 && echo "70"
         
-        echo "Generating locale..."; sleep 1
         debug $DEBUG_DEBUG "Configuring locale settings"
         echo "en_US.UTF-8 UTF-8" >> $INST_MNT/etc/locale.gen 2>> "$LOG_FILE"
         echo "LANG=en_US.UTF-8" >> $INST_MNT/etc/locale.conf 2>> "$LOG_FILE"
         debug $DEBUG_DEBUG "Running locale-gen"
-        artix-chroot $INST_MNT /bin/bash -c locale-gen >> "$LOG_FILE" 2>&1 && echo "60"
+        artix-chroot $INST_MNT /bin/bash -c locale-gen >> "$LOG_FILE" 2>&1 && echo "100"
     ) | dialog --gauge "Finalizing base installation..." 10 70 0
 
     if [[ $? -ne 0 ]]; then

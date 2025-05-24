@@ -272,46 +272,6 @@ configure_bootloader() {
     }
 }
 
-addlocales() {
-    debug $DEBUG_INFO "Adding locales"
-    
-    locale_list=$(grep -v '^$' /install/locale.gen | awk '{print $1}' | sort)
-    dialog_options=()
-    
-    while IFS= read -r locale; do
-        dialog_options+=("$locale" "$locale")
-    done <<< "$locale_list"
-
-    alocale=$(dialog --clear --title "Locale Selection" \
-        --menu "Choose your locale from the list:" 20 70 15 "${dialog_options[@]}" 2>&1 1>&3)
-
-    if [[ -z "$alocale" ]]; then
-        printf "%s\n" "No locale selected. Skipping locale configuration."
-        return 0
-    fi
-
-    debug $DEBUG_INFO "Selected locale: $alocale"
-    sed -i "s/^#\s*\($alocale\)/\1/" /etc/locale.gen >/dev/null 2>&4
-    if ! locale-gen >/dev/null 2>&4; then
-        debug $DEBUG_ERROR "Failed to generate locale"
-        restore_descriptors
-        error "Failed to generate locale!"
-    fi
-
-    printf "%s\n" "${bold}Locale '$alocale' has been added and generated successfully!"
-}
-
-setlocale() {
-    debug $DEBUG_INFO "Setting locale to $alocale"
-    
-    printf "%s\n" "${bold}Setting locale to $alocale"
-    if ! echo "LANG=$alocale" > /etc/locale.conf >/dev/null 2>&4; then
-        debug $DEBUG_ERROR "Failed to set locale"
-        restore_descriptors
-        error "Cannot set locale!"
-    fi
-}
-
 USERADD() {
     debug $DEBUG_INFO "Creating user account"
     
@@ -463,8 +423,6 @@ main() {
     debug $DEBUG_INFO "Starting main installation process"
     
     select_desktop_environment || error "Error selecting desktop environment!"
-    addlocales || error "Cannot generate locales"
-    setlocale || error "Cannot set locale"
     USERADD || error "Error adding user to your install"
     passwdroot || error "Error setting root password!"
     enableservices || error "Error enabling services!"
