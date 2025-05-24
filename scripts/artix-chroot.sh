@@ -353,6 +353,18 @@ USERADD() {
         error "Failed to set ownership of $home_dir"
     fi
 
+    # Ask about sudo privileges
+    if dialog --title "Sudo Privileges" \
+        --yesno "Do you want to grant sudo privileges to $username?" 7 60; then
+        debug $DEBUG_INFO "Granting sudo privileges to $username"
+        if ! sed -i 's/^#\s*\(%wheel\s\+ALL=(ALL:ALL)\s\+ALL\)/\1/' /etc/sudoers >/dev/null 2>&4; then
+            debug $DEBUG_ERROR "Failed to modify sudoers file"
+            restore_descriptors
+            error "Failed to grant sudo privileges"
+        fi
+        debug $DEBUG_INFO "Sudo privileges granted successfully"
+    fi
+
     password=$(dialog --clear --title "Set User Password" \
         --passwordbox "Enter the password for $username:" 10 50 2>&1 1>&3)
 
