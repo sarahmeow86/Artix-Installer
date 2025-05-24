@@ -117,7 +117,7 @@ mountall() {
 
         echo "Importing ZFS pool..."; sleep 1
         debug $DEBUG_DEBUG "Importing pool with -N flag: $ZFS_POOL_NAME"
-        zpool import -N "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1 && echo "30"
+        zpool import -N -R "$INST_MNT" "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1 && echo "30"
 
         echo "Mounting root dataset..."; sleep 1
         debug $DEBUG_DEBUG "Mounting root dataset"
