@@ -227,6 +227,15 @@ validate_kernel() {
     return 1
 }
 
+validate_locale() {
+    local locale="$1"
+    if grep -q "^#\s*$locale" /usr/share/i18n/SUPPORTED; then
+        return 0
+    fi
+    debug $DEBUG_ERROR "Invalid locale: $locale"
+    return 1
+}
+
 # Show help information
 show_help() {
     cat << EOF
@@ -242,14 +251,15 @@ Options:
     -d, --disk DEVICE      Specify the installation disk device (must use /dev/disk/by-id/ format)
     -f, --filesystem FS    Specify filesystem type (ext4, btrfs, zfs, xfs)
     -k, --kernel KERNEL    Specify kernel to install (linux, linux-zen, linux-lts)
+    -l, --locale LOCALE    Specify system locale (e.g., "en_US.UTF-8")
     -p, --pool-name NAME   Specify ZFS pool name (forces ZFS filesystem)
     -t, --timezone ZONE    Specify timezone (e.g., "Europe/Rome")
     -H, --hostname NAME    Specify system hostname
     -s, --swap-size SIZE   Specify swap partition size in GB (must be positive integer)
 
 Examples:
-    $0 -D 4 -d /dev/disk/by-id/ata-SanDisk_SSD_PLUS_120GB_123456 -f ext4 -k linux-zen -s 8
-    $0 --filesystem zfs --pool-name mypool --kernel linux-lts --swap-size 16
+    $0 -D 4 -d /dev/disk/by-id/ata-SanDisk_SSD_PLUS_120GB_123456 -f ext4 -k linux-zen -l en_US.UTF-8 -s 8
+    $0 --filesystem zfs --pool-name mypool --kernel linux-lts --locale en_GB.UTF-8 --swap-size 16
 EOF
     exit 0
 }
@@ -402,6 +412,18 @@ while [[ $# -gt 0 ]]; do
                 error "Kernel argument required"
             fi
             ;;
+        -l|--locale)
+            if [[ -n "$2" ]]; then
+                if validate_locale "$2"; then
+                    LOCALE="$2"
+                else
+                    error "Invalid locale: $2. Example format: en_US.UTF-8"
+                fi
+                shift 2
+            else
+                error "Locale argument required"
+            fi
+            ;;
         *)
             error "Unknown option: $1"
             ;;
@@ -445,6 +467,10 @@ perform_installation() {
     # Configure installation variables
     debug $DEBUG_INFO "Configuring installation variables"
     local var_steps=()
+    # Only add locale selection if no locale was specified
+    if [[ -z "$LOCALE" ]]; then
+        var_steps+=("addlocales")
+    fi
     # Only add kernel selection if no kernel was specified
     if [[ -z "$INST_LINVAR" ]]; then
         var_steps+=("installkrn")
