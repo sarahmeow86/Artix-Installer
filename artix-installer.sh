@@ -10,7 +10,7 @@ DEBUG_LEVEL=3  # Default debug level (INFO)
 bold=$(tput setaf 2 bold)
 bolderror=$(tput setaf 3 bold)
 normal=$(tput sgr0)
-INST_MNT=$(mktemp -d)
+INST_MNT=/mnt/artix
 # Only generate UUID if no pool name is provided
 INST_UUID=""
 ZFS_POOL_NAME=""
