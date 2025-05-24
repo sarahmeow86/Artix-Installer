@@ -12,7 +12,7 @@ installzfs() {
     (
         echo "10"; sleep 1
         echo "Installing ZFS packages..."; sleep 1
-        pacman -Sy --noconfirm zfs-dkms-git zfs-utils-git && echo "40"
+        pacman -Sy --noconfirm --needed zfs-dkms-git zfs-utils-git && echo "40"
         echo "Installing ZFS OpenRC package..."; sleep 1
         pacman -U --noconfirm misc/zfs-openrc-*.pkg.tar.zst && echo "70"
         echo "Loading ZFS kernel module..."; sleep 1
