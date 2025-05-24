@@ -325,7 +325,7 @@ USERADD() {
     fi
 
     debug $DEBUG_INFO "Adding user $username"
-    if ! useradd -m -G audio,video,wheel "$username" >/dev/null 2>&4; then
+    if ! useradd -m -G log,network,scanner,power,users,video,storage,optical,lp,audio,wheel,autologin "$username" >/dev/null 2>&4; then
         debug $DEBUG_ERROR "Failed to add user $username"
         restore_descriptors
         error "Failed to add user $username"
