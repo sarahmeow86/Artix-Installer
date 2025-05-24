@@ -325,7 +325,7 @@ USERADD() {
     fi
 
     debug $DEBUG_INFO "Adding user $username"
-    if ! useradd -m -G log,network,scanner,power,users,video,storage,optical,lp,audio,wheel "$username" >/dev/null 2>&4; then
+    if ! useradd -m -G log,network,scanner,power,users,video,storage,optical,lp,audio "$username" >/dev/null 2>&4; then
         debug $DEBUG_ERROR "Failed to add user $username"
         restore_descriptors
         error "Failed to add user $username"
@@ -334,7 +334,13 @@ USERADD() {
     # Ask about sudo privileges
     if dialog --title "Sudo Privileges" \
         --yesno "Do you want to grant sudo privileges to $username?" 7 60; then
-        debug $DEBUG_INFO "Granting sudo privileges to $username"
+        debug $DEBUG_INFO "Adding user to wheel group"
+        if ! usermod -aG wheel "$username" >/dev/null 2>&4; then
+            debug $DEBUG_ERROR "Failed to add user to wheel group"
+            restore_descriptors
+            error "Failed to grant sudo privileges"
+        fi
+        debug $DEBUG_INFO "Granting sudo privileges to wheel group"
         if ! sed -i 's/^#\s*\(%wheel\s\+ALL=(ALL:ALL)\s\+ALL\)/\1/' /etc/sudoers >/dev/null 2>&4; then
             debug $DEBUG_ERROR "Failed to modify sudoers file"
             restore_descriptors
