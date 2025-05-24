@@ -229,7 +229,7 @@ validate_kernel() {
 
 validate_locale() {
     local locale="$1"
-    if grep -q "^#\s*$locale" /usr/share/i18n/SUPPORTED; then
+    if grep -q "$locale" /usr/share/i18n/SUPPORTED; then
         return 0
     fi
     debug $DEBUG_ERROR "Invalid locale: $locale"
