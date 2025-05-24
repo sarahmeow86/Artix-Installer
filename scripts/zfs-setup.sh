@@ -111,9 +111,17 @@ mountall() {
     # Start the progress bar
     (
         echo "10"; sleep 1
+        echo "Exporting ZFS pool..."; sleep 1
+        debug $DEBUG_DEBUG "Exporting pool: $ZFS_POOL_NAME"
+        zpool export "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1 && echo "20"
+
+        echo "Importing ZFS pool..."; sleep 1
+        debug $DEBUG_DEBUG "Importing pool with -N flag: $ZFS_POOL_NAME"
+        zpool import -N "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1 && echo "30"
+
         echo "Mounting root dataset..."; sleep 1
         debug $DEBUG_DEBUG "Mounting root dataset"
-        zfs mount "$ZFS_POOL_NAME/os/artix" >> "$LOG_FILE" 2>&1 && echo "50"
+        zfs mount "$ZFS_POOL_NAME/os/artix" >> "$LOG_FILE" 2>&1 && echo "60"
         
         echo "Mounting home dataset..."; sleep 1
         debug $DEBUG_DEBUG "Mounting home dataset"

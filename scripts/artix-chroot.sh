@@ -331,28 +331,6 @@ USERADD() {
         error "Failed to add user $username"
     fi
 
-    debug $DEBUG_INFO "Creating home directory for $username"
-    home_dir="/home/$username"
-    if ! mkdir -p "$home_dir" >/dev/null 2>&4; then
-        debug $DEBUG_ERROR "Failed to create home directory"
-        restore_descriptors
-        error "Failed to create home directory for $username"
-    fi
-
-    debug $DEBUG_INFO "Copying skel files to home directory"
-    if ! cp -r /etc/skel/. "$home_dir/" >/dev/null 2>&4; then
-        debug $DEBUG_ERROR "Failed to copy skel files"
-        restore_descriptors
-        error "Failed to copy skel files to $home_dir"
-    fi
-
-    debug $DEBUG_INFO "Setting home directory ownership"
-    if ! chown -R "$username:$username" "$home_dir" >/dev/null 2>&4; then
-        debug $DEBUG_ERROR "Failed to set home directory ownership"
-        restore_descriptors
-        error "Failed to set ownership of $home_dir"
-    fi
-
     # Ask about sudo privileges
     if dialog --title "Sudo Privileges" \
         --yesno "Do you want to grant sudo privileges to $username?" 7 60; then
