@@ -42,7 +42,7 @@ debug() {
     fi
 }
 
-# Error handling <with debug
+# Error handling with debug
 cleanup_on_error() {
     debug $DEBUG_WARN "Error occurred, starting cleanup"
     save_logs
