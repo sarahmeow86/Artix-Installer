@@ -102,7 +102,7 @@ finishtouch() {
             done <<< "$locale_list"
 
             alocale=$(dialog --clear --title "Locale Selection" \
-                --menu "Choose your locale from the list:" 20 70 15 "${dialog_options[@]}" 2>&1 1>&4)
+                --menu "Choose your locale from the list:" 20 70 15 "${dialog_options[@]}" 2>&1 1>&3)
 
             if [[ -n "$alocale" ]]; then
                 debug $DEBUG_INFO "Setting locale: $alocale"
