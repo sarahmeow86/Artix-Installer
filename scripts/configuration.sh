@@ -95,7 +95,7 @@ finishtouch() {
         else
             echo "Selecting locale..."; sleep 1
             debug $DEBUG_DEBUG "Getting locale list"
-            locale_list=$(grep -v '^$' /usr/share/i18n/SUPPORTED | awk '{print $1}' | sort)
+            locale_list=$(grep -v '^#' /usr/share/i18n/SUPPORTED | cut -d' ' -f1 | sort -u)
             dialog_options=()
             while IFS= read -r locale; do
                 dialog_options+=("$locale" "$locale")
