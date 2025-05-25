@@ -95,7 +95,7 @@ finishtouch() {
         else
             echo "Selecting locale..."; sleep 1
             debug $DEBUG_DEBUG "Getting locale list"
-            locale_list=$(grep -v '^$' misc/locale.gen | awk '{print $1}' | sort)
+            locale_list=$(grep -v '^$' /usr/share/i18n/SUPPORTED | awk '{print $1}' | sort)
             dialog_options=()
             while IFS= read -r locale; do
                 dialog_options+=("$locale" "$locale")
@@ -122,7 +122,6 @@ finishtouch() {
         
         debug $DEBUG_DEBUG "Configuring locale settings"
         echo "en_US.UTF-8 UTF-8" >> $INST_MNT/etc/locale.gen 2>> "$LOG_FILE"
-        echo "LANG=en_US.UTF-8" >> $INST_MNT/etc/locale.conf 2>> "$LOG_FILE"
         debug $DEBUG_DEBUG "Running locale-gen"
         artix-chroot $INST_MNT /bin/bash -c locale-gen >> "$LOG_FILE" 2>&1 && echo "100"
     ) | dialog --gauge "Finalizing base installation..." 10 70 0
