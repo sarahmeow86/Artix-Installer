@@ -11,7 +11,9 @@ bold=$(tput setaf 2 bold)
 bolderror=$(tput setaf 3 bold)
 normal=$(tput sgr0)
 INST_MNT=/mnt/artix
-
+# Only generate UUID if no pool name is provided
+INST_UUID=""
+ZFS_POOL_NAME="tank"
 
 # Create log directory and file
 mkdir -p /var/log/artix-installer
@@ -431,9 +433,9 @@ done
 # Set pool name if using ZFS
 if [[ $FILESYSTEM == "zfs" ]]; then
     if [[ -z "$ZFS_POOL_NAME" ]]; then
-        # Set default pool name if none provided
+        # Generate UUID and set pool name if none provided
         ZFS_POOL_NAME="tank"
-        debug $DEBUG_INFO "Using default ZFS pool name: $ZFS_POOL_NAME"
+        debug $DEBUG_INFO "Generated ZFS pool name: $ZFS_POOL_NAME"
     else
         INST_UUID="" # Clear UUID when using custom pool name
         debug $DEBUG_INFO "Using provided ZFS pool name: $ZFS_POOL_NAME"
