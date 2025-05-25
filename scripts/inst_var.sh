@@ -67,6 +67,7 @@ installhost() {
         error "No hostname provided!"
     fi
 
+    export INST_HOST
     debug $DEBUG_INFO "Hostname set to: $INST_HOST"
     printf "%s\n" "${bold}Hostname set to $INST_HOST"
 }
