@@ -55,23 +55,6 @@ installtz() {
     printf "%s\n" "${bold}Timezone set to $region/$city"
 }
 
-installhost() {
-    debug $DEBUG_INFO "Starting hostname configuration"
-    printf "%s\n" "${bold}## Set desired hostname"
-
-    INST_HOST=$(dialog --clear --title "Hostname Configuration" \
-        --inputbox "Enter your desired hostname:" 10 50 3>&1 1>&2 2>&3)
-
-    if [[ -z "$INST_HOST" ]]; then
-        debug $DEBUG_ERROR "No hostname provided"
-        error "No hostname provided!"
-    fi
-
-    export INST_HOST
-    debug $DEBUG_INFO "Hostname set to: $INST_HOST"
-    printf "%s\n" "${bold}Hostname set to $INST_HOST"
-}
-
 installkrn() {
     debug $DEBUG_INFO "Starting kernel selection"
     printf "%s\n" "${bold}Select the kernel you want to install"

@@ -423,6 +423,24 @@ main() {
     debug $DEBUG_INFO "Starting main installation process"
     
     select_desktop_environment || error "Error selecting desktop environment!"
+
+    # Configure hostname
+    hostname=$(dialog --clear --title "Hostname Configuration" \
+        --inputbox "Enter your desired hostname:" 10 50 2>&1 1>&3)
+
+    if [[ -z "$hostname" ]]; then
+        debug $DEBUG_ERROR "No hostname provided"
+        restore_descriptors
+        error "No hostname provided!"
+    fi
+
+    debug $DEBUG_INFO "Setting hostname: $hostname"
+    echo "$hostname" > /etc/hostname || {
+        debug $DEBUG_ERROR "Failed to set hostname"
+        restore_descriptors
+        error "Failed to set hostname"
+    }
+
     USERADD || error "Error adding user to your install"
     passwdroot || error "Error setting root password!"
     enableservices || error "Error enabling services!"

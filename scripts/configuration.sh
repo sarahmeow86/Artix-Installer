@@ -111,20 +111,6 @@ finishtouch() {
             fi
         fi
         echo "30"
-
-        echo "Setting hostname..."; sleep 1
-        if [[ -n "$INST_HOST" ]]; then
-            debug $DEBUG_DEBUG "Setting hostname to: $INST_HOST"
-            echo "$INST_HOST" > "$INST_MNT/etc/hostname" || {
-                debug $DEBUG_ERROR "Failed to set hostname"
-                error "Failed to set hostname in target system"
-            }
-            debug $DEBUG_INFO "Hostname set successfully"
-        else
-            debug $DEBUG_ERROR "No hostname specified"
-            error "No hostname specified for target system"
-        fi
-        echo "50"
         
         echo "Setting timezone..."; sleep 1
         debug $DEBUG_DEBUG "Setting timezone to: $INST_TZ"

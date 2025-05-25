@@ -252,7 +252,6 @@ Options:
     -l, --locale LOCALE    Specify system locale (e.g., "en_US.UTF-8")
     -p, --pool-name NAME   Specify ZFS pool name (forces ZFS filesystem)
     -t, --timezone ZONE    Specify timezone (e.g., "Europe/Rome")
-    -H, --hostname NAME    Specify system hostname
     -s, --swap-size SIZE   Specify swap partition size in GB (must be positive integer)
 
 Examples:
@@ -320,14 +319,6 @@ while [[ $# -gt 0 ]]; do
         -v|--version)
             echo "Artix Installer version $VERSION"
             exit 0
-            ;;
-        -H|--hostname)
-            if [[ -n "$2" ]]; then
-                HOSTNAME="$2"
-                shift 2
-            else
-                error "Hostname argument required"
-            fi
             ;;
         -t|--timezone)
             if [[ -n "$2" ]]; then
@@ -468,10 +459,6 @@ perform_installation() {
     # Only add kernel selection if no kernel was specified
     if [[ -z "$INST_LINVAR" ]]; then
         var_steps+=("installkrn")
-    fi
-    # Only add hostname selection if no hostname was specified
-    if [[ -z "$HOSTNAME" ]]; then
-        var_steps+=("installhost")
     fi
     # Only add timezone selection if no timezone was specified
     if [[ -z "$TIMEZONE" ]]; then
