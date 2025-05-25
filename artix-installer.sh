@@ -11,8 +11,6 @@ bold=$(tput setaf 2 bold)
 bolderror=$(tput setaf 3 bold)
 normal=$(tput sgr0)
 INST_MNT=/mnt/artix
-# Only generate UUID if no pool name is provided
-INST_UUID=""
 ZFS_POOL_NAME="tank"
 
 # Create log directory and file
@@ -44,7 +42,7 @@ debug() {
     fi
 }
 
-# Error handling with debug
+# Error handling <with debug
 cleanup_on_error() {
     debug $DEBUG_WARN "Error occurred, starting cleanup"
     save_logs
