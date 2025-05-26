@@ -74,5 +74,5 @@ Contributions are welcome! Please open issues or submit pull requests for improv
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+This project is licensed under the GPL-V3 License. See [LICENSE](LICENSE) for details.
 
