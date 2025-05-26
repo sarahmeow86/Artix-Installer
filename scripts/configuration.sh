@@ -102,7 +102,8 @@ finishtouch() {
             done <<< "$locale_list"
 
             alocale=$(dialog --clear --title "Locale Selection" \
-                --menu "Choose your locale from the list:" 20 70 15 "${dialog_options[@]}" 2>&1 1>&3)
+                --menu "Choose your locale from the list:" 20 70 15 "${dialog_options[@]}" \
+                2>> "$LOG_FILE" 1>/dev/tty)
 
             if [[ -n "$alocale" ]]; then
                 debug $DEBUG_INFO "Setting locale: $alocale"
@@ -153,9 +154,6 @@ prepare_chroot() {
             debug $DEBUG_DEBUG "Copying ZFS OpenRC package"
             cp misc/zfs-openrc-20241023-1-any.pkg.tar.zst $INST_MNT/install/ >> "$LOG_FILE" 2>&1 || error "Failed to copy ZFS OpenRC package!"
         fi
-
-        debug $DEBUG_DEBUG "Copying locale configuration"
-        cp misc/locale.gen $INST_MNT/install/ >> "$LOG_FILE" 2>&1 || error "Failed to copy locale.gen!"
 
         debug $DEBUG_DEBUG "Preparing chroot script with variables"
         awk -v n=5 -v s="DISK=${DISK}" 'NR == n {print s} {print}' scripts/artix-chroot.sh > scripts/artix-chroot-new2.sh 2>> "$LOG_FILE"
