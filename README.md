@@ -14,11 +14,12 @@ Artix Installer is a tool designed to simplify and automate the installation pro
 
 1. Download an Artix live image
 2. Flash it on a USB drive (or use Ventoy)
-3. Install git :
+3. Boot from it
+4. Install git :
     ```sh
     sudo pacman -Sy git
     ```
-3. Clone this repository:
+5. Clone this repository:
     ```sh
     git clone https://github.com/yourusername/Artix-Installer.git
     cd Artix-Installer
