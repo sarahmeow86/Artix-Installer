@@ -23,7 +23,8 @@ Artix Installer is a tool designed to simplify and automate the installation pro
 
 Run the installer script with appropriate permissions:
 ```sh
-./install.sh
+sudo su
+./artix-installer.sh
 ```
 Follow the on-screen instructions to complete the installation.
 
@@ -58,8 +59,8 @@ These flags are provided to speed up the installation process by allowing you to
 #### Examples
 
 ```sh
-./install.sh -D 4 -d /dev/disk/by-id/ata-SanDisk_SSD_PLUS_120GB_123456 -f ext4 -k linux-zen -l en_US.UTF-8 -s 8
-./install.sh --filesystem zfs --pool-name mypool --kernel linux-lts --locale en_GB.UTF-8 --swap-size 16
+./artix-installer.sh -D 4 -d /dev/disk/by-id/ata-SanDisk_SSD_PLUS_120GB_123456 -f ext4 -k linux-zen -l en_US.UTF-8 -s 8
+./artix-installer.sh --filesystem zfs --pool-name mypool --kernel linux-lts --locale en_GB.UTF-8 --swap-size 16
 ```
 
 ## Requirements
