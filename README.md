@@ -12,12 +12,17 @@ Artix Installer is a tool designed to simplify and automate the installation pro
 
 ## Installation
 
-1. Clone this repository:
+1. Download an Artix live image
+2. Install git :
+    ```sh
+    sudo pacman -Sy git
+    ```
+3. Clone this repository:
     ```sh
     git clone https://github.com/yourusername/Artix-Installer.git
     cd Artix-Installer
     ```
-2. Make sure you have the required dependencies installed (see below).
+4. Make sure you have the required dependencies installed (see below).
 
 ## Usage
 
