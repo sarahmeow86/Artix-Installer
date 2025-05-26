@@ -66,7 +66,7 @@ These flags are provided to speed up the installation process by allowing you to
 ## Requirements
 
 - Bash (or compatible shell)
-- Artix Linux ISO or live environment
+- Artix Linux ISO live environment
 - Internet connection (for package downloads)
 
 ## Contributing
