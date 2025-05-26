@@ -23,8 +23,6 @@ Artix Installer is a tool designed to simplify and automate the installation pro
     git clone https://github.com/yourusername/Artix-Installer.git
     cd Artix-Installer
     ```
-4. Make sure you have the required dependencies installed (see below).
-
 ## Usage
 
 Run the installer script with appropriate permissions:
