@@ -364,17 +364,12 @@ enable_services() {
     
     if [[ "$DE" == "none" ]]; then
         debug $DEBUG_INFO "Base install - enabling NetworkManager only"
-        mkdir -p /etc/runlevels/default
-        if [[ -f "/etc/init.d/NetworkManager" ]]; then
-            ln -sf "/etc/init.d/NetworkManager" "/etc/runlevels/default/NetworkManager" || {
-                debug $DEBUG_ERROR "Failed to enable NetworkManager"
-                error "Failed to enable NetworkManager"
+          if [[ -f "/install/services/$DE-services.tar.gz" ]]; then
+            tar xzf "/install/services/$DE-services.tar.gz" -C /etc || {
+                debug $DEBUG_ERROR "Failed to extract services archive for $DE"
+                error "Failed to extract services configuration"
             }
-            debug $DEBUG_INFO "NetworkManager enabled successfully"
-        else
-            debug $DEBUG_ERROR "NetworkManager service not found"
-            error "NetworkManager service not found in /etc/init.d"
-        fi
+            fi
     else
         debug $DEBUG_INFO "Extracting service configuration for $DE"
         if [[ -f "/install/services/$DE-services.tar.gz" ]]; then

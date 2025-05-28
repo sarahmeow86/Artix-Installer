@@ -66,9 +66,6 @@ rootpool() {
         error "Error setting up the root pool!"
     fi
 
-    # Check for other pools to import after root pool is set up
-    check_existing_pools
-
     debug $DEBUG_INFO "Root pool created successfully"
     printf "%s\n" "${bold}Root pool created successfully!"
 }
@@ -136,9 +133,14 @@ mountall() {
         error "Error mounting datasets!"
     fi
 
+    check_existing_pools
+
     # Setting cachefile and zgenhostid files
     debug $DEBUG_DEBUG "Setting cachefile and zgenhostid files"
     zpool set cachefile=/etc/zfs/zpool.cache "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1 || error "Failed to set cachefile property!"
+    if [[ -n "$discovered_pools" ]]; then
+    zpool set cachefile=/etc/zfs/zpool.cache "$discovered_pools" >> "$LOG_FILE" 2>&1 || error "Failed to set cachefile property!"
+    fi
     mkdir -p "$INST_MNT/etc/zfs" >> "$LOG_FILE" 2>&1 || error "Failed to create /etc/zfs directory!"
     cp /etc/zfs/zpool.cache "$INST_MNT/etc/zfs/zpool.cache" >> "$LOG_FILE" 2>&1 || error "Failed to copy zpool.cache file!"
     cp /etc/hostid "$INST_MNT/etc/hostid" >> "$LOG_FILE" 2>&1 || error "Failed to copy hostid file!"

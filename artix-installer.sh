@@ -361,7 +361,7 @@ while [[ $# -gt 0 ]]; do
                 if validate_filesystem "$2"; then
                     FILESYSTEM="$2"
                 else
-                    error "Invalid filesystem: $2. Valid options are: ${VALID_FILESYSTEMS[*]}"
+                    error "Invalid filesystem: $2. Valid options are: ${valid_filesystems[*]}"
                 fi
                 shift 2
             else
