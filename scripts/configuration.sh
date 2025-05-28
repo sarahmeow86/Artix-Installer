@@ -115,7 +115,7 @@ finishtouch() {
         
         echo "Setting timezone..."; sleep 1
         debug $DEBUG_DEBUG "Setting timezone to: $INST_TZ"
-        ln -sf $INST_MNT/usr/share/zoneinfo/$INST_TZ $INST_MNT/etc/localtime >> "$LOG_FILE" 2>&1 && echo "70"
+        ln -sf ../usr/share/zoneinfo/$INST_TZ $INST_MNT/etc/localtime >> "$LOG_FILE" 2>&1 && echo "70"
         
         debug $DEBUG_DEBUG "Configuring locale settings"
         echo "en_US.UTF-8 UTF-8" >> $INST_MNT/etc/locale.gen 2>> "$LOG_FILE"
