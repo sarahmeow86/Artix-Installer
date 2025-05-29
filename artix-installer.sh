@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Artix Linux Installer Script
+# Created by [Sarah saretta1986@proton.me]
 # Debug levels
 DEBUG_OFF=0
 DEBUG_ERROR=1
