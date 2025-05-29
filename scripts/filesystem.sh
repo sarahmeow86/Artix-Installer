@@ -27,16 +27,18 @@ setup_filesystem() {
     
     case "$FILESYSTEM" in
         ext4)
+            mkdir -p $INST_MNT
             debug $DEBUG_DEBUG "Formatting root partition as ext4"
             mkfs.ext4 -F "${DISK}-part2" >> "$LOG_FILE" 2>&1 || error "Failed to format partition as ext4!"
             debug $DEBUG_DEBUG "Mounting root partition"
-            mount "${DISK}-part2" $INST_MNT >> "$LOG_FILE" 2>&1 || error "Failed to mount ext4 filesystem!"
+            mount --mkdir "${DISK}-part2" $INST_MNT >> "$LOG_FILE" 2>&1 || error "Failed to mount ext4 filesystem!"
             debug $DEBUG_DEBUG "Formatting home partition as ext4"
             mkfs.ext4 -F "${DISK}-part3" >> "$LOG_FILE" 2>&1 || error "Failed to format home partition!"
             debug $DEBUG_DEBUG "Mounting home partition"
             mount --mkdir "${DISK}-part3" $INST_MNT/home >> "$LOG_FILE" 2>&1 || error "Failed to mount home!"
             ;;
         btrfs)
+            mkdir -p $INST_MNT
             debug $DEBUG_DEBUG "Formatting root partition as btrfs"
             mkfs.btrfs -f "${DISK}-part2" >> "$LOG_FILE" 2>&1 || error "Failed to format partition as btrfs!"
             debug $DEBUG_DEBUG "Mounting btrfs filesystem"
@@ -58,9 +60,10 @@ setup_filesystem() {
             mkdir -p $INST_MNT/var/log >> "$LOG_FILE" 2>&1 || error "Failed to create var log directory!"
             mount -o subvol=@log "${DISK}-part2" $INST_MNT/var/log >> "$LOG_FILE" 2>&1 || error "Failed to mount var log!"
             mkdir -p $INST_MNT/home >> "$LOG_FILE" 2>&1 || error "Failed to create home directory!"
-            mount --mkdir "${DISK}-part3" $INST_MNT/home >> "$LOG_FILE" 2>&1 || error "Failed to mount home!"
+            mount "${DISK}-part3" $INST_MNT/home >> "$LOG_FILE" 2>&1 || error "Failed to mount home!"
             ;;
         xfs)
+            mkdir -p $INST_MNT
             debug $DEBUG_DEBUG "Formatting root partition as xfs"
             mkfs.xfs -f "${DISK}-part2" >> "$LOG_FILE" 2>&1 || error "Failed to format partition as xfs!"
             debug $DEBUG_DEBUG "Mounting root partition"
