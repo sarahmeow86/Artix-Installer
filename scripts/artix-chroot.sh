@@ -414,6 +414,19 @@ enableservices() {
     printf "%s\n" "${bold}Services enabled successfully!"
 }
 
+set_timezone() {
+    debug $DEBUG_INFO "Setting up timezone"
+    
+    TIMEZONE="${TIMEZONE:-Europe/Rome}"  # Default to Europe/Rome if not set
+
+    # Set timezone
+    echo "Setting timezone to: $TIMEZONE"
+    ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
+    hwclock --systohc
+
+    printf "%s\n" "${bold}Timezone set to $TIMEZONE"
+}
+
 main() {
     debug $DEBUG_INFO "Starting main installation process"
     
@@ -440,6 +453,7 @@ main() {
     passwdroot || error "Error setting root password!"
     enableservices || error "Error enabling services!"
     configure_bootloader || error "Error configuring bootloader!"
+    set_timezone || error "Error setting timezone!"
 
     debug $DEBUG_INFO "Installation completed successfully"
     dialog --title "Installation Complete" --msgbox "\

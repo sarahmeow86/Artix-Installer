@@ -90,7 +90,7 @@ finishtouch() {
 
         if [[ -n "$LOCALE" ]]; then
             debug $DEBUG_INFO "Using provided locale: $LOCALE"
-            sed -i "s/^#\s*\($LOCALE\)/\1/" $INST_MNT/etc/locale.gen
+            echo "$LOCALE UTF-8" >> $INST_MNT/etc/locale.gen
             echo "LANG=$LOCALE" > $INST_MNT/etc/locale.conf
         else
             echo "Selecting locale..."; sleep 1
@@ -102,20 +102,15 @@ finishtouch() {
             done <<< "$locale_list"
 
             alocale=$(dialog --clear --title "Locale Selection" \
-                --menu "Choose your locale from the list:" 20 70 15 "${dialog_options[@]}" \
-                2>> "$LOG_FILE" 1>/dev/tty)
+                --menu "Choose your locale from the list:" 20 70 15 "${dialog_options[@]}" 2>&1)
 
             if [[ -n "$alocale" ]]; then
                 debug $DEBUG_INFO "Setting locale: $alocale"
-                sed -i "s/^#\s*\($alocale\)/\1/" $INST_MNT/etc/locale.gen
+                echo "$alocale UTF-8" >> $INST_MNT/etc/locale.gen
                 echo "LANG=$alocale" > $INST_MNT/etc/locale.conf
             fi
         fi
         echo "30"
-        
-        echo "Setting timezone..."; sleep 1
-        debug $DEBUG_DEBUG "Setting timezone to: $INST_TZ"
-        ln -sf ../usr/share/zoneinfo/$INST_TZ $INST_MNT/etc/localtime >> "$LOG_FILE" 2>&1 && echo "70"
         
         debug $DEBUG_DEBUG "Configuring locale settings"
         echo "en_US.UTF-8 UTF-8" >> $INST_MNT/etc/locale.gen 2>> "$LOG_FILE"
@@ -156,7 +151,7 @@ prepare_chroot() {
         fi
 
         debug $DEBUG_DEBUG "Preparing chroot script with variables"
-        awk -v n=5 -v s="DISK=${DISK}" 'NR == n {print s} {print}' scripts/artix-chroot.sh > scripts/artix-chroot-new2.sh 2>> "$LOG_FILE"
+        awk -v n=5 -v s="TIMEZONE=${TIMEZONE}" 'NR == n {print s} {print}' scripts/artix-chroot.sh > scripts/artix-chroot-new2.sh 2>> "$LOG_FILE"
         mv scripts/artix-chroot-new2.sh $INST_MNT/install/artix-chroot.sh
         chmod +x $INST_MNT/install/artix-chroot.sh >> "$LOG_FILE" 2>&1 && echo "80"
         
@@ -175,7 +170,6 @@ prepare_chroot() {
 
 run_chroot() {
     printf "%s\n" "${bold}Running chroot script"
-    
     artix-chroot $INST_MNT /bin/bash /install/artix-chroot.sh 
     printf "%s\n" "${bold}Chroot script executed successfully!"
 }
