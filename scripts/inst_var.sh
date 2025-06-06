@@ -95,7 +95,7 @@ selectdisk() {
 
     # Create a dialog menu for disk selection with a larger box
     disk=$(dialog --clear --title "Disk Selection" \
-        --menu "Choose a disk to use: DON'T USE PARTITIONS, THIS SCRIPT ASSUMES THE USE OF ONE DRIVE!!" 30 80 20 "${dialog_options[@]}" 3>&1 1>&2 2>&3)
+        --menu "Choose a disk to use: THIS SCRIPT WILL DELETE EVERYTHING ON THAT DRIVE!!" 30 80 20 "${dialog_options[@]}" 3>&1 1>&2 2>&3)
 
     if [[ -z "$disk" ]]; then
         debug $DEBUG_ERROR "No disk selected"
