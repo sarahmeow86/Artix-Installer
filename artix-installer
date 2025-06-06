@@ -188,8 +188,8 @@ check_swap || error "Error handling swap partitions!"
 
 # Source required scripts
 debug $DEBUG_INFO "Sourcing installation scripts"
-for script in zfs-live.sh zfs-setup.sh inst_var.sh disksetup.sh installpkgs.sh \
-             configuration.sh filesystem.sh efi.sh repoconfig.sh ; do
+for script in zfs-live zfs-setup inst_var disksetup installpkgs \
+             configuration filesystem efi repoconfig ; do
     debug $DEBUG_DEBUG "Sourcing: $script"
     source "./scripts/$script" || error "Failed to source $script"
 done

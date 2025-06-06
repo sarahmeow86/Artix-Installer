@@ -151,9 +151,9 @@ prepare_chroot() {
         fi
 
         debug $DEBUG_DEBUG "Preparing chroot script with variables"
-        awk -v n=5 -v s="TIMEZONE=${TIMEZONE}" 'NR == n {print s} {print}' scripts/artix-chroot.sh > scripts/artix-chroot-new2.sh 2>> "$LOG_FILE"
-        mv scripts/artix-chroot-new2.sh $INST_MNT/install/artix-chroot.sh
-        chmod +x $INST_MNT/install/artix-chroot.sh >> "$LOG_FILE" 2>&1 && echo "80"
+        awk -v n=5 -v s="TIMEZONE=${TIMEZONE}" 'NR == n {print s} {print}' scripts/artix-chroot > scripts/artix-chroot-new2 2>> "$LOG_FILE"
+        mv scripts/artix-chroot-new2 $INST_MNT/install/artix-chroot
+        chmod +x $INST_MNT/install/artix-chroot >> "$LOG_FILE" 2>&1 && echo "80"
         
         debug $DEBUG_DEBUG "Chroot environment preparation complete"
         echo "100"
@@ -170,6 +170,6 @@ prepare_chroot() {
 
 run_chroot() {
     printf "%s\n" "${bold}Running chroot script"
-    artix-chroot $INST_MNT /bin/bash /install/artix-chroot.sh 
+    artix-chroot $INST_MNT /bin/bash /install/artix-chroot 
     printf "%s\n" "${bold}Chroot script executed successfully!"
 }
