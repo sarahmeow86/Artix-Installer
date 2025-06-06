@@ -417,8 +417,6 @@ enableservices() {
 set_timezone() {
     debug $DEBUG_INFO "Setting up timezone"
     
-    TIMEZONE="${TIMEZONE:-Europe/Rome}"  # Default to Europe/Rome if not set
-
     # Set timezone
     echo "Setting timezone to: $TIMEZONE"
     ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
