@@ -15,6 +15,23 @@ normal=$(tput sgr0)
 INST_MNT=/mnt/artix
 ZFS_POOL_NAME="tank"
 
+# Path handling function
+get_script_path() {
+    local file="$1"
+    local type="$2" # can be 'scripts' or 'misc'
+    local installed_path="/usr/share/artix-installer/$type/$file"
+    local dev_path="$(dirname "$(realpath "$0")")/$type/$file"
+
+    if [[ -f "$installed_path" ]]; then
+        echo "$installed_path"
+    elif [[ -f "$dev_path" ]]; then
+        echo "$dev_path"
+    else
+        debug $DEBUG_ERROR "Could not find $type file: $file"
+        error "Required file not found: $file"
+    fi
+}
+
 # Create log directory and file
 mkdir -p /var/log/artix-installer
 LOG_FILE="/var/log/artix-installer/install-$(date +%Y%m%d-%H%M%S).log"
@@ -191,7 +208,7 @@ debug $DEBUG_INFO "Sourcing installation scripts"
 for script in zfs-live zfs-setup inst_var disksetup installpkgs \
              configuration filesystem efi repoconfig ; do
     debug $DEBUG_DEBUG "Sourcing: $script"
-    source "./scripts/$script" || error "Failed to source $script"
+    source "$(get_script_path "$script" "scripts")" || error "Failed to source $script"
 done
 
 validate_swap_size() {

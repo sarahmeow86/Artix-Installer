@@ -46,6 +46,10 @@ addrepo() {
     debug $DEBUG_INFO "Starting repository configuration"
     printf "%s\n" "## Adding repos to /etc/pacman.conf."
 
+    # Get the path to pacman.conf
+    local pacman_conf
+    pacman_conf="$(get_script_path "pacman.conf" "misc")"
+
     # Start the progress bar
     (
         echo "10"; sleep 1
@@ -55,7 +59,7 @@ addrepo() {
         
         echo "Copying pacman.conf to /etc/..."; sleep 1
         debug $DEBUG_DEBUG "Copying pacman.conf to /etc/"
-        cp misc/pacman.conf /etc/ >> "$LOG_FILE" 2>&1 && echo "100"
+        cp "$pacman_conf" /etc/ >> "$LOG_FILE" 2>&1 && echo "100"
     ) | dialog --gauge "Adding repositories to pacman.conf..." 10 70 0
 
     if [[ $? -ne 0 ]]; then

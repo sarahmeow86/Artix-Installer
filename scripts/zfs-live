@@ -8,13 +8,17 @@ normal=$(tput sgr0)            # resets text settings back to normal
 installzfs() {
     printf "%s\n" "${bold}# Installing the ZFS modules"
 
+    # Get path for ZFS OpenRC package
+    local zfs_openrc
+    zfs_openrc="$(get_script_path "zfs-openrc-*.pkg.tar.zst" "misc")"
+
     # Start the progress bar
     (
         echo "10"; sleep 1
         echo "Installing ZFS packages..."; sleep 1
         pacman -Sy --noconfirm --needed zfs-dkms-git zfs-utils-git && echo "40"
         echo "Installing ZFS OpenRC package..."; sleep 1
-        pacman -U --noconfirm misc/zfs-openrc-*.pkg.tar.zst && echo "70"
+        pacman -U --noconfirm "$zfs_openrc" && echo "70"
         echo "Loading ZFS kernel module..."; sleep 1
         modprobe zfs && echo "90"
         zgenhostid -f && echo "100"

@@ -3,12 +3,18 @@ installpkgs() {
     debug $DEBUG_INFO "Starting package installation"
     printf "%s\n" "${bold}Installing packages"
 
+    # Get paths for required files
+    local pkglist
+    local zfs_openrc
+    pkglist="$(get_script_path "pkglist.txt" "misc")"
+    zfs_openrc="$(get_script_path "zfs-openrc-*.pkg.tar.zst" "misc")"
+
     # Start the progress bar
     (
         echo "10"; sleep 1
         echo "Installing base packages..."; sleep 1
         debug $DEBUG_DEBUG "Installing base packages from pkglist.txt"
-        basestrap $INST_MNT - < misc/pkglist.txt >> "$LOG_FILE" 2>&1 && echo "50"
+        basestrap $INST_MNT - < "$pkglist" >> "$LOG_FILE" 2>&1 && echo "50"
         
         echo "Installing kernel packages..."; sleep 1
         debug $DEBUG_DEBUG "Installing kernel: $INST_LINVAR"
@@ -20,7 +26,7 @@ installpkgs() {
             debug $DEBUG_DEBUG "Installing ZFS packages from misc directory"
             basestrap $INST_MNT zfs-dkms-git zfs-utils-git
             debug $DEBUG_DEBUG "Installing ZFS OpenRC package"
-            basestrap -U $INST_MNT misc/zfs-openrc-*.pkg.tar.zst >> "$LOG_FILE" 2>&1 && echo "90"
+            basestrap -U $INST_MNT "$zfs_openrc" >> "$LOG_FILE" 2>&1 && echo "90"
         fi
         
         echo "Copying pacman configuration..."; sleep 1

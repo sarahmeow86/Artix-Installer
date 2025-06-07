@@ -21,7 +21,7 @@ Artix Installer is a tool designed to simplify and automate the installation pro
     ```
 5. Clone this repository:
     ```sh
-    git clone https://github.com/yourusername/Artix-Installer.git
+    git clone https://github.com/sarahmeow86/Artix-Installer.git
     cd Artix-Installer
     ```
 ## Usage

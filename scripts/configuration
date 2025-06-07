@@ -131,6 +131,17 @@ prepare_chroot() {
     debug $DEBUG_INFO "Starting chroot environment preparation"
     printf "%s\n" "${bold}Preparing chroot environment"
 
+    # Get paths for required files
+    local pkglists
+    local services_dir
+    local zfs_openrc
+    local chroot_script
+    
+    pkglists="$(get_script_path "pkglist-*.txt" "misc")"
+    services_dir="$(get_script_path "services" "misc")"
+    zfs_openrc="$(get_script_path "zfs-openrc-*.pkg.tar.zst" "misc")"
+    chroot_script="$(get_script_path "artix-chrooting" "scripts")"
+
     # Start the progress bar
     (
         echo "10"; sleep 1
@@ -138,22 +149,22 @@ prepare_chroot() {
         mkdir -p $INST_MNT/install >> "$LOG_FILE" 2>&1 || error "Failed to create install directory!"
         
         debug $DEBUG_DEBUG "Copying package lists"
-        cp misc/pkglist-*.txt $INST_MNT/install/ >> "$LOG_FILE" 2>&1 || error "Failed to copy package lists!"
+        cp "$pkglists" $INST_MNT/install/ >> "$LOG_FILE" 2>&1 || error "Failed to copy package lists!"
         
         debug $DEBUG_DEBUG "Creating services directory"
         mkdir -p $INST_MNT/install/services >> "$LOG_FILE" 2>&1
         debug $DEBUG_DEBUG "Copying service files"
-        cp misc/services/* $INST_MNT/install/services/ >> "$LOG_FILE" 2>&1 || error "Failed to copy service files!"
+        cp "$services_dir"/* $INST_MNT/install/services/ >> "$LOG_FILE" 2>&1 || error "Failed to copy service files!"
 
         if [[ $FILESYSTEM == "zfs" ]]; then
             debug $DEBUG_DEBUG "Copying ZFS OpenRC package"
-            cp misc/zfs-openrc-20241023-1-any.pkg.tar.zst $INST_MNT/install/ >> "$LOG_FILE" 2>&1 || error "Failed to copy ZFS OpenRC package!"
+            cp "$zfs_openrc" $INST_MNT/install/ >> "$LOG_FILE" 2>&1 || error "Failed to copy ZFS OpenRC package!"
         fi
 
         debug $DEBUG_DEBUG "Preparing chroot script with variables"
-        awk -v n=5 -v s="TIMEZONE=${TIMEZONE}" 'NR == n {print s} {print}' scripts/artix-chrooting > scripts/artix-chrooting-new 2>> "$LOG_FILE"
-        mv scripts/artix-chrooting-new $INST_MNT/install/artix-chrooting
-        chmod +x $INST_MNT/install/artix-chroot >> "$LOG_FILE" 2>&1 && echo "80"
+        awk -v n=5 -v s="TIMEZONE=${TIMEZONE}" 'NR == n {print s} {print}' "$chroot_script" > "$chroot_script-new" 2>> "$LOG_FILE"
+        mv "$chroot_script-new" $INST_MNT/install/artix-chrooting
+        chmod +x $INST_MNT/install/artix-chrooting >> "$LOG_FILE" 2>&1 && echo "80"
         
         debug $DEBUG_DEBUG "Chroot environment preparation complete"
         echo "100"
