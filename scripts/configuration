@@ -172,7 +172,7 @@ prepare_chroot() {
         if [[ $FILESYSTEM == "zfs" ]]; then
             debug $DEBUG_DEBUG "Looking for ZFS OpenRC package"
             local misc_dir=$(dirname "$pkglists")
-            zfs_openrc=$(find "$misc_dir" -name "zfs-openrc-*.pkg.tar.zst" -type f | head -n 1)
+            zfs_openrc=$(find "$misc_dir" -name "zfs-openrc-20241023-1-any.pkg.tar" -type f | head -n 1)
             
             if [[ -z "$zfs_openrc" ]]; then
                 error "ZFS OpenRC package not found!"
