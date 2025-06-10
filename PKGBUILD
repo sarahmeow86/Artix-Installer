@@ -5,11 +5,10 @@ pkgver=1.0.0
 pkgrel=1
 pkgdesc="Artix Linux Installation Script"
 arch=('any')
-url="https://github.com/yourusername/Artix-Installer"
+url="https://github.com/yourusernamesarahmeow86/Artix-Installer"
 license=('GPL')
 depends=('bash' 'dialog' 'gptfdisk')
 optdepends=('zfs-dkms: for ZFS support')
-backup=('etc/artix-installer/config')
 source=()
 
 package() {
