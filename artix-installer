@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Artix Linux Installer Script
 # Created by [Sarah saretta1986@proton.me]
+
 # Debug levels
 DEBUG_OFF=0
 DEBUG_ERROR=1
 DEBUG_WARN=2
 DEBUG_INFO=3
 DEBUG_DEBUG=4
+
 # Default debug level and colors
 DEBUG_LEVEL=3  # Default debug level (INFO)
 bold=$(tput setaf 2 bold)
@@ -14,6 +16,40 @@ bolderror=$(tput setaf 3 bold)
 normal=$(tput sgr0)
 INST_MNT=/mnt/artix
 ZFS_POOL_NAME="tank"
+
+# YAD common settings
+YAD_WIDTH=600
+YAD_HEIGHT=400
+YAD_TITLE="Artix Installer"
+YAD_WINDOW_ICON="drive-harddisk"
+
+# YAD helper functions
+show_message() {
+    local title="$1"
+    local message="$2"
+    local type="${3:-info}"  # Default to info
+    
+    yad --title="$title" \
+        --text="$message" \
+        --width=$YAD_WIDTH \
+        --image="dialog-$type" \
+        --button="OK:0"
+}
+
+show_error() {
+    show_message "Error" "$1" "error"
+}
+
+show_progress() {
+    local message="$1"
+    echo "$message" | yad --progress \
+        --title="$YAD_TITLE" \
+        --text="$message" \
+        --width=$YAD_WIDTH \
+        --auto-close \
+        --auto-kill \
+        --pulsate
+}
 
 # Path handling function
 get_script_path() {
@@ -168,7 +204,7 @@ check_swap() {
     
     if [[ ${#active_swaps[@]} -gt 0 ]]; then
         debug $DEBUG_INFO "Found active swap partitions: ${active_swaps[*]}"
-        dialog --infobox "Deactivating active swap partitions..." 5 50
+        show_message "Deactivating Swap" "Deactivating active swap partitions..."
         for swap in "${active_swaps[@]}"; do
             debug $DEBUG_DEBUG "Deactivating swap: $swap"
             swapoff "$swap" || error "Failed to deactivate swap partition: $swap"
@@ -179,13 +215,13 @@ check_swap() {
     fi
 }
 
-# Check for dialog
+# Check for yad
 debug $DEBUG_INFO "Checking for required packages"
-if ! command -v dialog &> /dev/null; then
-    debug $DEBUG_WARN "dialog not found, attempting installation"
-    pacman -Sy --noconfirm dialog gptfdisk || {
+if ! command -v yad &> /dev/null; then
+    debug $DEBUG_WARN "yad not found, attempting installation"
+    pacman -Sy --noconfirm yad gptfdisk || {
         debug $DEBUG_ERROR "Failed to install required packages"
-        error "Failed to install dialog. Please install it manually."
+        error "Failed to install yad. Please install it manually."
     }
 fi
 
@@ -193,9 +229,7 @@ fi
 debug $DEBUG_INFO "Checking root privileges"
 if [[ $EUID -ne 0 ]]; then
     debug $DEBUG_ERROR "Script not running as root"
-    dialog --title "Permission Denied" --msgbox "\
-${bolderror}ERROR:${normal} This script must be run as root.\n\n\
-Please run it with sudo or as the root user." 10 50
+    show_error "This script must be run as root.\n\nPlease run it with sudo or as the root user."
     exit 1
 fi
 

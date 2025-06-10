@@ -1,83 +1,108 @@
 #!/usr/bin/env bash
 installtz() {
     debug $DEBUG_INFO "Starting timezone configuration"
-    printf "%s\n" "${bold}## Setting install variables"
 
     debug $DEBUG_DEBUG "Generating region list"
     region_list=$(find /usr/share/zoneinfo -mindepth 1 -maxdepth 1 -type d | sed 's|/usr/share/zoneinfo/||' | sort)
 
-    # Prepare the list of regions for the dialog menu
-    dialog_options=()
-    index=1
-    while IFS= read -r region; do
-        dialog_options+=("$index" "$region")
-        index=$((index + 1))
-    done <<< "$region_list"
+    # Create region selection list
+    region_data=""
+    for region in $region_list; do
+        region_data+="$region!"
+    done
+    region_data=${region_data%!}
 
-    # Create a dialog menu for regions
-    region_index=$(dialog --clear --title "Region Selection" \
-        --menu "Choose your region:" 20 60 15 "${dialog_options[@]}" 3>&1 1>&2 2>&3)
+    region=$(yad --list \
+        --title="Region Selection" \
+        --text="Select your region:" \
+        --width=400 \
+        --height=400 \
+        --column="Region" \
+        --separator="" \
+        --button="Cancel:1" \
+        --button="Select:0" \
+        ${region_data})
 
-    # Check if the user selected a region
-    if [[ -z "$region_index" ]]; then
+    if [[ -z "$region" ]]; then
+        yad --error \
+            --title="Error" \
+            --text="No region selected!" \
+            --width=300
         error "No region selected!"
     fi
-
-    # Map the selected index back to the region
-    region=$(echo "$region_list" | sed -n "${region_index}p")
 
     debug $DEBUG_DEBUG "Selected region: $region"
     debug $DEBUG_DEBUG "Generating city list for region: $region"
     city_list=$(find "/usr/share/zoneinfo/$region" -type f | sed "s|/usr/share/zoneinfo/$region/||" | sort)
 
-    # Prepare the list of cities for the dialog menu
-    dialog_options=()
-    index=1
-    while IFS= read -r city; do
-        dialog_options+=("$index" "$city")
-        index=$((index + 1))
-    done <<< "$city_list"
+    # Create city selection list
+    city_data=""
+    for city in $city_list; do
+        city_data+="$city!"
+    done
+    city_data=${city_data%!}
 
-    # Create a dialog menu for cities
-    city_index=$(dialog --clear --title "City Selection" \
-        --menu "Choose your city in $region:" 20 60 15 "${dialog_options[@]}" 3>&1 1>&2 2>&3)
+    city=$(yad --list \
+        --title="City Selection" \
+        --text="Select your city in $region:" \
+        --width=400 \
+        --height=400 \
+        --column="City" \
+        --separator="" \
+        --button="Cancel:1" \
+        --button="Select:0" \
+        ${city_data})
 
-    # Check if the user selected a city
-    if [[ -z "$city_index" ]]; then
+    if [[ -z "$city" ]]; then
+        yad --error \
+            --title="Error" \
+            --text="No city selected!" \
+            --width=300
         error "No city selected!"
     fi
 
-    # Map the selected index back to the city
-    city=$(echo "$city_list" | sed -n "${city_index}p")
-
     INST_TZ="/usr/share/zoneinfo/$region/$city"
     debug $DEBUG_INFO "Timezone set to: $region/$city"
-    printf "%s\n" "${bold}Timezone set to $region/$city"
+    yad --info \
+        --title="Timezone Selection" \
+        --text="Selected timezone: $region/$city" \
+        --width=300
 }
 
 installkrn() {
     debug $DEBUG_INFO "Starting kernel selection"
-    printf "%s\n" "${bold}Select the kernel you want to install"
-    
-    kernel_choice=$(dialog --clear --title "Kernel Selection" \
-        --menu "Choose one of the following kernels:" 15 50 3 \
-        1 "linux" \
-        2 "linux-zen" \
-        3 "linux-lts" \
-        3>&1 1>&2 2>&3)
 
-    case $kernel_choice in
-        1) INST_LINVAR="linux" ;;
-        2) INST_LINVAR="linux-zen" ;;
-        3) INST_LINVAR="linux-lts" ;;
+    selected=$(yad --list \
+        --title="Kernel Selection" \
+        --text="Select the kernel to install:" \
+        --width=300 \
+        --height=200 \
+        --radiolist \
+        --column="Select" \
+        --column="Kernel" \
+        --column="Description" \
+        TRUE "linux" "Standard kernel" \
+        FALSE "linux-zen" "Zen kernel" \
+        FALSE "linux-lts" "Long-term support")
+
+    case $selected in
+        linux*) INST_LINVAR="linux" ;;
+        *zen*) INST_LINVAR="linux-zen" ;;
+        *lts*) INST_LINVAR="linux-lts" ;;
         *) 
-            debug $DEBUG_ERROR "Invalid kernel choice selected"
-            error "Invalid kernel choice!" 
+            yad --error \
+                --title="Error" \
+                --text="Invalid kernel selection!" \
+                --width=300
+            error "Invalid kernel choice!"
             ;;
     esac
 
     debug $DEBUG_INFO "Kernel selected: $INST_LINVAR"
-    printf "%s\n" "${bold}Kernel selected: $INST_LINVAR"
+    yad --info \
+        --title="Kernel Selection" \
+        --text="Selected kernel: $INST_LINVAR" \
+        --width=300
 }
 
 selectdisk() {
@@ -87,22 +112,38 @@ selectdisk() {
     debug $DEBUG_DEBUG "Generating disk list"
     disk_list=$(ls -1 /dev/disk/by-id | grep -v -- "-part[0-9]")
 
-    # Prepare the list for the dialog menu
-    dialog_options=()
+    # Create disk selection list for YAD
+    disk_data=""
     for disk in $disk_list; do
-        dialog_options+=("$disk" "Disk")
+        size=$(lsblk -dno SIZE /dev/disk/by-id/"$disk" 2>/dev/null)
+        disk_data+="$disk!$size!"
     done
+    disk_data=${disk_data%!}  # Remove trailing delimiter
 
-    # Create a dialog menu for disk selection with a larger box
-    disk=$(dialog --clear --title "Disk Selection" \
-        --menu "Choose a disk to use: THIS SCRIPT WILL DELETE EVERYTHING ON THAT DRIVE!!" 30 80 20 "${dialog_options[@]}" 3>&1 1>&2 2>&3)
+    selected=$(yad --list \
+        --title="Disk Selection" \
+        --text="<b>WARNING: THIS WILL DELETE EVERYTHING ON THE SELECTED DRIVE!</b>" \
+        --width=600 \
+        --height=400 \
+        --column="Disk" \
+        --column="Size" \
+        --separator="" \
+        --button="Cancel:1" \
+        --button="Select:0" \
+        ${disk_data})
 
-    if [[ -z "$disk" ]]; then
-        debug $DEBUG_ERROR "No disk selected"
+    if [[ -z "$selected" ]]; then
+        yad --error \
+            --title="Error" \
+            --text="No disk selected!" \
+            --width=300
         error "No disk selected!"
     fi
 
-    DISK="/dev/disk/by-id/$disk"
+    DISK="/dev/disk/by-id/${selected}"
     debug $DEBUG_INFO "Disk selected: $DISK"
-    printf "%s\n" "${bold}Disk selected: $DISK"
+    yad --info \
+        --title="Disk Selection" \
+        --text="Selected disk: ${selected}" \
+        --width=300
 }

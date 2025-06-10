@@ -57,24 +57,26 @@ error() {
 select_desktop_environment() {
     debug $DEBUG_INFO "Starting desktop environment selection"
     
-    # Create temporary file for dialog output
-    temp_choice=$(mktemp)
-    debug $DEBUG_DEBUG "Created temporary choice file: $temp_choice"
+    DE_CHOICE=$(yad --list \
+        --title="Desktop Environment Selection" \
+        --text="Choose a desktop environment to install:" \
+        --width=400 \
+        --height=300 \
+        --radiolist \
+        --column="Select" \
+        --column="ID" \
+        --column="Environment" \
+        TRUE 1 "Base (No Desktop Environment)" \
+        FALSE 2 "Cinnamon" \
+        FALSE 3 "MATE" \
+        FALSE 4 "KDE Plasma" \
+        FALSE 5 "LXQt" \
+        FALSE 6 "XFCE" \
+        --separator="" \
+        --print-column=2)
 
-    # Display dialog menu - using saved descriptors
-    dialog --clear --title "Desktop Environment Selection" \
-        --menu "Choose a desktop environment to install:" 15 60 6 \
-        1 "Base (No Desktop Environment)" \
-        2 "Cinnamon" \
-        3 "MATE" \
-        4 "KDE Plasma" \
-        5 "LXQt" \
-        6 "XFCE" 2>"$temp_choice" >&3
+    [[ -z "$DE_CHOICE" ]] && error "No desktop environment selected!"
 
-    # Read user's choice
-    DE_CHOICE=$(<"$temp_choice")
-    rm -f "$temp_choice"
-    
     # Map the choice to the corresponding pkglist file and set DE name
     case $DE_CHOICE in
         1) 
@@ -107,26 +109,29 @@ select_desktop_environment() {
             ;;
     esac
 
-    # Install packages from the selected pkglist
+    # Install packages
     if [[ -f "/install/$PKGLIST" ]]; then
         debug $DEBUG_INFO "Installing packages for $DE"
-        dialog --infobox "Installing packages for $DE..." 5 50 >&3
         (
-            echo "10" >&3; sleep 1
-            echo "Installing packages..." >&3
+            echo "# Installing packages for $DE..."
+            echo "10"
             debug $DEBUG_DEBUG "Running pacman to install packages"
-            if pacman -Sy --noconfirm - < "/install/$PKGLIST" >/dev/null 2>&4; then
+            if pacman -Sy --noconfirm - < "/install/$PKGLIST"; then
                 debug $DEBUG_INFO "Package installation completed successfully"
-                echo "100" >&3
+                echo "100"
             else
                 debug $DEBUG_ERROR "Package installation failed"
-                restore_descriptors
                 error "Failed to install packages!"
             fi
-        ) | dialog --gauge "Installing $DE packages..." 10 70 0 >&3
+        ) | yad --progress \
+            --title="Package Installation" \
+            --text="Installing $DE packages..." \
+            --width=400 \
+            --height=100 \
+            --auto-close \
+            --auto-kill \
+            --percentage=0
     else
-        debug $DEBUG_ERROR "Package list not found: /install/$PKGLIST"
-        restore_descriptors
         error "Package list file not found!"
     fi
 
@@ -275,14 +280,19 @@ configure_bootloader() {
 USERADD() {
     debug $DEBUG_INFO "Creating user account"
     
-    username=$(dialog --clear --title "Create User Account" \
-        --inputbox "Enter the non-root username:" 10 50 2>&1 1>&3)
-
-    if [[ -z "$username" ]]; then
-        debug $DEBUG_ERROR "No username provided"
-        restore_descriptors
-        error "No username provided!"
-    fi
+    user_info=$(yad --form \
+        --title="Create User Account" \
+        --text="Enter user account details:" \
+        --field="Username" \
+        --field="Password:H" \
+        --field="Sudo privileges:CHK" \
+        --width=400)
+    
+    [[ -z "$user_info" ]] && error "No user information provided!"
+    
+    username=$(echo "$user_info" | cut -d'|' -f1)
+    password=$(echo "$user_info" | cut -d'|' -f2)
+    sudo_priv=$(echo "$user_info" | cut -d'|' -f3)
 
     debug $DEBUG_INFO "Adding user $username"
     if ! useradd -m -G log,network,scanner,power,users,video,storage,optical,lp,audio "$username" >/dev/null 2>&4; then
@@ -292,8 +302,7 @@ USERADD() {
     fi
 
     # Ask about sudo privileges
-    if dialog --title "Sudo Privileges" \
-        --yesno "Do you want to grant sudo privileges to $username?" 7 60; then
+    if [[ "$sudo_priv" == "TRUE" ]]; then
         debug $DEBUG_INFO "Adding user to wheel group"
         if ! usermod -aG wheel "$username" >/dev/null 2>&4; then
             debug $DEBUG_ERROR "Failed to add user to wheel group"
@@ -309,15 +318,6 @@ USERADD() {
         debug $DEBUG_INFO "Sudo privileges granted successfully"
     fi
 
-    password=$(dialog --clear --title "Set User Password" \
-        --passwordbox "Enter the password for $username:" 10 50 2>&1 1>&3)
-
-    if [[ -z "$password" ]]; then
-        debug $DEBUG_ERROR "No password provided"
-        restore_descriptors
-        error "No password provided!"
-    fi
-
     debug $DEBUG_INFO "Setting password for user $username"
     if ! echo "$username:$password" | chpasswd >/dev/null 2>&4; then
         debug $DEBUG_ERROR "Failed to set password for $username"
@@ -331,26 +331,22 @@ USERADD() {
 passwdroot() {
     debug $DEBUG_INFO "Setting root password"
     
-    rootpass=$(dialog --clear --title "Set Root Password" \
-        --passwordbox "Enter the password for root:" 10 50 2>&1 1>&3)
-
-    if [[ -z "$rootpass" ]]; then
-        debug $DEBUG_ERROR "No root password provided"
-        restore_descriptors
-        error "No root password provided!"
-    fi
-
-    rootpass_confirm=$(dialog --clear --title "Confirm Root Password" \
-        --passwordbox "Confirm the password for root:" 10 50 2>&1 1>&3)
-
-    if [[ "$rootpass" != "$rootpass_confirm" ]]; then
-        debug $DEBUG_ERROR "Root passwords do not match"
-        restore_descriptors
-        error "Passwords do not match!"
-    fi
+    root_pass=$(yad --form \
+        --title="Set Root Password" \
+        --text="Enter root password:" \
+        --field="Password:H" \
+        --field="Confirm Password:H" \
+        --width=400)
+    
+    [[ -z "$root_pass" ]] && error "No root password provided!"
+    
+    password=$(echo "$root_pass" | cut -d'|' -f1)
+    confirm=$(echo "$root_pass" | cut -d'|' -f2)
+    
+    [[ "$password" != "$confirm" ]] && error "Passwords do not match!"
 
     debug $DEBUG_INFO "Setting root password"
-    if ! echo "root:$rootpass" | chpasswd >/dev/null 2>&4; then
+    if ! echo "root:$password" | chpasswd >/dev/null 2>&4; then
         debug $DEBUG_ERROR "Failed to set root password"
         restore_descriptors
         error "Failed to set root password"
@@ -430,15 +426,13 @@ main() {
     
     select_desktop_environment || error "Error selecting desktop environment!"
 
-    # Configure hostname
-    hostname=$(dialog --clear --title "Hostname Configuration" \
-        --inputbox "Enter your desired hostname:" 10 50 2>&1 1>&3)
-
-    if [[ -z "$hostname" ]]; then
-        debug $DEBUG_ERROR "No hostname provided"
-        restore_descriptors
-        error "No hostname provided!"
-    fi
+    hostname=$(yad --form \
+        --title="Hostname Configuration" \
+        --text="Enter system hostname:" \
+        --field="Hostname" \
+        --width=400)
+    
+    [[ -z "$hostname" ]] && error "No hostname provided!"
 
     debug $DEBUG_INFO "Setting hostname: $hostname"
     echo "$hostname" > /etc/hostname || {
@@ -454,9 +448,10 @@ main() {
     set_timezone || error "Error setting timezone!"
 
     debug $DEBUG_INFO "Installation completed successfully"
-    dialog --title "Installation Complete" --msgbox "\
-${bold}Finish!${normal}\n\n\
-The installation process has been completed successfully." 10 50 >&3
+    yad --info \
+        --title="Installation Complete" \
+        --text="<b>Installation Completed!</b>\n\nThe installation process has been completed successfully." \
+        --width=400
 }
 
 debug $DEBUG_INFO "Script initialization complete"

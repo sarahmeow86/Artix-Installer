@@ -182,6 +182,7 @@ which
 wpa_supplicant
 xxhash
 xz
+yad
 zeromq
 zlib
 zstd

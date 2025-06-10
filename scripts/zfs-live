@@ -12,22 +12,46 @@ installzfs() {
     local zfs_openrc
     zfs_openrc="$(get_script_path "zfs-openrc-*.pkg.tar.zst" "misc")"
 
-    # Start the progress bar
+    # Start the progress bar with YAD
     (
-        echo "10"; sleep 1
-        echo "Installing ZFS packages..."; sleep 1
-        pacman -Sy --noconfirm --needed zfs-dkms-git zfs-utils-git && echo "40"
-        echo "Installing ZFS OpenRC package..."; sleep 1
-        pacman -U --noconfirm "$zfs_openrc" && echo "70"
-        echo "Loading ZFS kernel module..."; sleep 1
-        modprobe zfs && echo "90"
-        zgenhostid -f && echo "100"
-    ) | dialog --gauge "Installing ZFS modules..." 10 70 0
+        echo "# Installing ZFS packages..."
+        echo "10"
+        pacman -Sy --noconfirm --needed zfs-dkms-git zfs-utils-git
+        
+        echo "# Installing ZFS OpenRC package..."
+        echo "40"
+        pacman -U --noconfirm "$zfs_openrc"
+        
+        echo "# Loading ZFS kernel module..."
+        echo "70"
+        modprobe zfs
+        
+        echo "# Generating hostid..."
+        echo "90"
+        zgenhostid -f
+        echo "100"
+    ) | yad --progress \
+        --title="ZFS Installation" \
+        --text="Installing ZFS modules..." \
+        --width=400 \
+        --height=100 \
+        --auto-close \
+        --auto-kill \
+        --percentage=0
 
     # Check if ZFS was installed successfully
     if ! modinfo zfs &>/dev/null; then
-        error "Error installing ZFS!"
+        yad --error \
+            --title="ZFS Installation Error" \
+            --text="Failed to install ZFS modules.\nPlease check the logs for more details." \
+            --width=300
+        error "Error installing ZFS modules!"
     fi
+
+    yad --info \
+        --title="ZFS Installation" \
+        --text="ZFS modules installed successfully!" \
+        --width=300
 
     printf "%s\n" "${bold}Done!"
 }

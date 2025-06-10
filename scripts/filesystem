@@ -1,91 +1,124 @@
 #!/usr/bin/env bash
 choose_filesystem() {
-    dialog --clear --title "Filesystem Selection" \
-        --menu "Choose your preferred filesystem:" 15 50 4 \
-        1 "ext4" \
-        2 "btrfs" \
-        3 "xfs" \
-        4 "zfs" 2> /tmp/fs_choice
+    FILESYSTEM=$(yad --list \
+        --title="Filesystem Selection" \
+        --text="Choose your preferred filesystem:" \
+        --width=300 \
+        --height=200 \
+        --radiolist \
+        --column="Select" \
+        --column="Filesystem" \
+        --column="Description" \
+        TRUE "ext4" "Standard Linux filesystem" \
+        FALSE "btrfs" "Modern CoW filesystem" \
+        FALSE "xfs" "High-performance filesystem" \
+        FALSE "zfs" "Advanced storage platform" \
+        --separator="" \
+        --button="Cancel:1" \
+        --button="Select:0")
 
-    FS_CHOICE=$(< /tmp/fs_choice)
-    rm /tmp/fs_choice
-
-    case $FS_CHOICE in
-        1) FILESYSTEM="ext4" ;;
-        2) FILESYSTEM="btrfs" ;;
-        3) FILESYSTEM="xfs" ;;
-        4) FILESYSTEM="zfs" ;;
-        *) error "Invalid choice or no selection made!" ;;
-    esac
-
-    dialog --msgbox "You selected $FILESYSTEM as your filesystem." 10 50
+    [[ -z "$FILESYSTEM" ]] && error "No filesystem selected!"
+    
+    yad --info \
+        --title="Filesystem Selection" \
+        --text="Selected filesystem: $FILESYSTEM" \
+        --width=300
 }
-
 
 setup_filesystem() {
     debug $DEBUG_INFO "Setting up filesystem"
     
+    show_progress() {
+        yad --progress \
+            --title="Filesystem Setup" \
+            --text="Setting up $FILESYSTEM filesystem..." \
+            --width=400 \
+            --height=100 \
+            --auto-close \
+            --auto-kill \
+            --percentage=0
+    }
+    
     case "$FILESYSTEM" in
-        ext4)
-            mkdir -p $INST_MNT
-            debug $DEBUG_DEBUG "Formatting root partition as ext4"
-            mkfs.ext4 -F "${DISK}-part2" >> "$LOG_FILE" 2>&1 || error "Failed to format partition as ext4!"
-            debug $DEBUG_DEBUG "Mounting root partition"
-            mount "${DISK}-part2" $INST_MNT >> "$LOG_FILE" 2>&1 || error "Failed to mount ext4 filesystem!"
-            debug $DEBUG_DEBUG "Formatting home partition as ext4"
-            mkfs.ext4 -F "${DISK}-part3" >> "$LOG_FILE" 2>&1 || error "Failed to format home partition!"
-            debug $DEBUG_DEBUG "Mounting home partition"
-            mkdir -p $INST_MNT/home >> "$LOG_FILE" 2>&1 || error "Failed to create home directory!"
-            mount "${DISK}-part3" $INST_MNT/home >> "$LOG_FILE" 2>&1 || error "Failed to mount home!"
+        ext4|xfs)
+            (
+                echo "# Creating mount points..."
+                echo "20"
+                mkdir -p $INST_MNT
+                
+                echo "# Formatting root partition..."
+                echo "40"
+                if [[ $FILESYSTEM == "ext4" ]]; then
+                    mkfs.ext4 -F "${DISK}-part2"
+                else
+                    mkfs.xfs -f "${DISK}-part2"
+                fi
+                
+                echo "# Mounting root partition..."
+                echo "60"
+                mount "${DISK}-part2" $INST_MNT
+                
+                echo "# Setting up home partition..."
+                echo "80"
+                mkfs.ext4 -F "${DISK}-part3"
+                mkdir -p $INST_MNT/home
+                mount "${DISK}-part3" $INST_MNT/home
+                echo "100"
+            ) | show_progress
             ;;
-        btrfs)
-            mkdir -p $INST_MNT
-            debug $DEBUG_DEBUG "Formatting root partition as btrfs"
-            mkfs.btrfs -f "${DISK}-part2" >> "$LOG_FILE" 2>&1 || error "Failed to format partition as btrfs!"
-            debug $DEBUG_DEBUG "Mounting btrfs filesystem"
-            mount "${DISK}-part2" $INST_MNT >> "$LOG_FILE" 2>&1 || error "Failed to mount btrfs filesystem!"
-
-            debug $DEBUG_DEBUG "Creating btrfs subvolumes"
-            btrfs subvolume create $INST_MNT/@ >> "$LOG_FILE" 2>&1 || error "Failed to create root subvolume!"
-            btrfs subvolume create $INST_MNT/@cache >> "$LOG_FILE" 2>&1 || error "Failed to create var subvolume!"
-            btrfs subvolume create $INST_MNT/@log >> "$LOG_FILE" 2>&1 || error "Failed to create var log subvolume!"
             
-            debug $DEBUG_DEBUG "Formatting home partition as ext4"            
-            mkfs.ext4 -F "${DISK}-part3" >> "$LOG_FILE" 2>&1 || error "Failed to format home partition!"
-
-            debug $DEBUG_DEBUG "Remounting with subvolumes"
-            umount $INST_MNT >> "$LOG_FILE" 2>&1 || error "Failed to unmount Btrfs filesystem!"
-            mount -o subvol=@ "${DISK}-part2" $INST_MNT >> "$LOG_FILE" 2>&1 || error "Failed to mount root subvolume!"
-            mkdir -p $INST_MNT/var/cache >> "$LOG_FILE" 2>&1 || error "Failed to create var cache directory!"
-            mount -o subvol=@cache "${DISK}-part2" $INST_MNT/var/cache >> "$LOG_FILE" 2>&1 || error "Failed to mount var cache!"
-            mkdir -p $INST_MNT/var/log >> "$LOG_FILE" 2>&1 || error "Failed to create var log directory!"
-            mount -o subvol=@log "${DISK}-part2" $INST_MNT/var/log >> "$LOG_FILE" 2>&1 || error "Failed to mount var log!"
-            mkdir -p $INST_MNT/home >> "$LOG_FILE" 2>&1 || error "Failed to create home directory!"
-            mount "${DISK}-part3" $INST_MNT/home >> "$LOG_FILE" 2>&1 || error "Failed to mount home!"
+        btrfs)
+            (
+                echo "# Creating mount points..."
+                echo "10"
+                mkdir -p $INST_MNT
+                
+                echo "# Formatting btrfs partition..."
+                echo "30"
+                mkfs.btrfs -f "${DISK}-part2"
+                mount "${DISK}-part2" $INST_MNT
+                
+                echo "# Creating subvolumes..."
+                echo "50"
+                btrfs subvolume create $INST_MNT/@
+                btrfs subvolume create $INST_MNT/@cache
+                btrfs subvolume create $INST_MNT/@log
+                
+                echo "# Setting up mounts..."
+                echo "70"
+                umount $INST_MNT
+                mount -o subvol=@ "${DISK}-part2" $INST_MNT
+                mkdir -p $INST_MNT/{var/cache,var/log,home}
+                mount -o subvol=@cache "${DISK}-part2" $INST_MNT/var/cache
+                mount -o subvol=@log "${DISK}-part2" $INST_MNT/var/log
+                
+                echo "# Setting up home partition..."
+                echo "90"
+                mkfs.ext4 -F "${DISK}-part3"
+                mount "${DISK}-part3" $INST_MNT/home
+                echo "100"
+            ) | show_progress
             ;;
-        xfs)
-            mkdir -p $INST_MNT
-            debug $DEBUG_DEBUG "Formatting root partition as xfs"
-            mkfs.xfs -f "${DISK}-part2" >> "$LOG_FILE" 2>&1 || error "Failed to format partition as xfs!"
-            debug $DEBUG_DEBUG "Mounting root partition"
-            mount "${DISK}-part2" $INST_MNT >> "$LOG_FILE" 2>&1 || error "Failed to mount xfs filesystem!"
-            debug $DEBUG_DEBUG "Formatting home partition as ext4"
-            mkfs.ext4 -F "${DISK}-part3" >> "$LOG_FILE" 2>&1 || error "Failed to format home partition!"
-            debug $DEBUG_DEBUG "Mounting home partition"
-            mkdir -p $INST_MNT/home >> "$LOG_FILE" 2>&1 || error "Failed to create home directory!"
-            mount "${DISK}-part3" $INST_MNT/home >> "$LOG_FILE" 2>&1 || error "Failed to mount home!"
-            ;;
+            
         zfs)
+            # ZFS setup is handled by separate functions
             rootpool || error "Error creating ZFS root pool!"
             createdatasets || error "Error creating ZFS datasets!"
             mountall || error "Error mounting ZFS datasets!"
             ;;
+            
         *)
-            debug $DEBUG_ERROR "Invalid filesystem selected: $FILESYSTEM"
+            yad --error \
+                --title="Filesystem Error" \
+                --text="Unsupported filesystem: $FILESYSTEM" \
+                --width=300
             error "Unsupported filesystem selected!"
             ;;
     esac
 
-    debug $DEBUG_INFO "Filesystem setup completed successfully"
+    yad --info \
+        --title="Filesystem Setup" \
+        --text="Filesystem setup completed successfully!" \
+        --width=300
 }
 

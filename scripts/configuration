@@ -3,28 +3,33 @@ fstab() {
     debug $DEBUG_INFO "Starting fstab generation"
     printf "%s\n" "${bold}Generating fstab"
 
-    # Start the progress bar
     (
-        echo "10"; sleep 1
-        debug $DEBUG_DEBUG "Creating /etc directory"
+        echo "# Creating /etc directory..."
+        echo "10"
         mkdir -p "$INST_MNT/etc" >> "$LOG_FILE" 2>&1 || error "Failed to create /etc directory!"
         
         if [[ $FILESYSTEM == "btrfs" || $FILESYSTEM == "xfs" || $FILESYSTEM == "ext4" ]]; then
-            debug $DEBUG_DEBUG "Generating fstab for $FILESYSTEM"
-            echo "Generating fstab with UUIDs..."; sleep 1
-            fstabgen -U "$INST_MNT" >> "$INST_MNT/etc/fstab" 2>> "$LOG_FILE" && echo "100"
+            echo "# Generating fstab with UUIDs..."
+            echo "50"
+            fstabgen -U "$INST_MNT" >> "$INST_MNT/etc/fstab" 2>> "$LOG_FILE"
         elif [[ $FILESYSTEM == "zfs" ]]; then
-            debug $DEBUG_DEBUG "Generating fstab for ZFS"
-            echo "Adding EFI partition to fstab..."; sleep 1
-            echo "UUID=$(blkid -s UUID -o value ${DISK}-part1) /boot/efi vfat umask=0022,fmask=0022,dmask=0022 0 1" >> "$INST_MNT/etc/fstab" 2>> "$LOG_FILE" && echo "50"
+            echo "# Adding EFI partition to fstab..."
+            echo "50"
+            echo "UUID=$(blkid -s UUID -o value ${DISK}-part1) /boot/efi vfat umask=0022,fmask=0022,dmask=0022 0 1" >> "$INST_MNT/etc/fstab" 2>> "$LOG_FILE"
             
-            echo "Adding swap partition to fstab..."; sleep 1
-            echo "UUID=$(blkid -s UUID -o value ${DISK}-part3) none swap defaults 0 0" >> "$INST_MNT/etc/fstab" 2>> "$LOG_FILE" && echo "100"
-        else
-            debug $DEBUG_ERROR "Unsupported filesystem: $FILESYSTEM"
-            error "Unsupported filesystem: $FILESYSTEM"
+            echo "# Adding swap partition to fstab..."
+            echo "90"
+            echo "UUID=$(blkid -s UUID -o value ${DISK}-part3) none swap defaults 0 0" >> "$INST_MNT/etc/fstab" 2>> "$LOG_FILE"
         fi
-    ) | dialog --gauge "Generating fstab..." 10 70 0
+        echo "100"
+    ) | yad --progress \
+        --title="fstab Generation" \
+        --text="Generating fstab..." \
+        --width=400 \
+        --height=100 \
+        --auto-close \
+        --auto-kill \
+        --percentage=0
 
     # Verify fstab
     debug $DEBUG_DEBUG "Verifying fstab file"
@@ -40,6 +45,12 @@ fstab() {
 
     debug $DEBUG_INFO "fstab generation completed successfully"
     printf "%s\n" "${bold}fstab generated successfully!"
+
+
+    yad --info \
+        --title="fstab Generation" \
+        --text="fstab generated successfully!" \
+        --width=300
 }
 
 configure_initramfs() {
@@ -47,28 +58,33 @@ configure_initramfs() {
     printf "%s\n" "${bold}Configuring initramfs..."
 
     (
-        echo "10"; sleep 1
+        echo "# Configuring initramfs..."
+        echo "10"
         
         if [[ $FILESYSTEM == "zfs" ]]; then
-            debug $DEBUG_DEBUG "Configuring for ZFS"
-            echo "Backing up existing mkinitcpio.conf..."; sleep 1
-            if ! mv $INST_MNT/etc/mkinitcpio.conf $INST_MNT/etc/mkinitcpio.conf.back >> "$LOG_FILE" 2>&1; then
-                debug $DEBUG_ERROR "Failed to backup mkinitcpio.conf"
-                error "Failed to back up mkinitcpio.conf!"
-            else
-                echo "30"
-            fi
-            debug $DEBUG_DEBUG "Writing ZFS-enabled mkinitcpio.conf"
+            echo "# Backing up mkinitcpio.conf..."
+            echo "30"
+            mv $INST_MNT/etc/mkinitcpio.conf $INST_MNT/etc/mkinitcpio.conf.back >> "$LOG_FILE" 2>&1
+            
+            echo "# Writing ZFS configuration..."
+            echo "50"
             tee $INST_MNT/etc/mkinitcpio.conf >> "$LOG_FILE" 2>&1 <<EOF
 HOOKS=(base udev autodetect modconf block keyboard zfs filesystems)
 EOF
-            echo "50"
         fi
 
-        debug $DEBUG_DEBUG "Regenerating initramfs"
-        echo "Regenerating initramfs..."; sleep 1
-        artix-chroot $INST_MNT /bin/bash -c "mkinitcpio -P" >> "$LOG_FILE" 2>&1 && echo "100"
-    ) | dialog --gauge "Configuring initramfs..." 10 70 0
+        echo "# Regenerating initramfs..."
+        echo "80"
+        artix-chroot $INST_MNT /bin/bash -c "mkinitcpio -P" >> "$LOG_FILE" 2>&1
+        echo "100"
+    ) | yad --progress \
+        --title="Initramfs Configuration" \
+        --text="Configuring initramfs..." \
+        --width=400 \
+        --height=100 \
+        --auto-close \
+        --auto-kill \
+        --percentage=0
 
     if [[ $? -ne 0 ]]; then
         debug $DEBUG_ERROR "initramfs regeneration failed"
@@ -86,28 +102,29 @@ finishtouch() {
 
     # Start the progress bar
     (
-        echo "10"; sleep 1
-
         if [[ -n "$LOCALE" ]]; then
             debug $DEBUG_INFO "Using provided locale: $LOCALE"
             echo "$LOCALE UTF-8" >> $INST_MNT/etc/locale.gen
             echo "LANG=$LOCALE" > $INST_MNT/etc/locale.conf
         else
-            echo "Selecting locale..."; sleep 1
             debug $DEBUG_DEBUG "Getting locale list"
             locale_list=$(grep -v '^#' /usr/share/i18n/SUPPORTED | cut -d' ' -f1 | sort -u)
-            dialog_options=()
-            while IFS= read -r locale; do
-                dialog_options+=("$locale" "$locale")
-            done <<< "$locale_list"
+            
+            selected_locale=$(echo "$locale_list" | yad --list \
+                --title="Locale Selection" \
+                --text="Choose your locale:" \
+                --width=400 \
+                --height=400 \
+                --column="Locale" \
+                --search-column=1 \
+                --separator="" \
+                --button="Cancel:1" \
+                --button="Select:0")
 
-            alocale=$(dialog --clear --title "Locale Selection" \
-                --menu "Choose your locale from the list:" 20 70 15 "${dialog_options[@]}" 2>&1)
-
-            if [[ -n "$alocale" ]]; then
-                debug $DEBUG_INFO "Setting locale: $alocale"
-                echo "$alocale UTF-8" >> $INST_MNT/etc/locale.gen
-                echo "LANG=$alocale" > $INST_MNT/etc/locale.conf
+            if [[ -n "$selected_locale" ]]; then
+                debug $DEBUG_INFO "Setting locale: $selected_locale"
+                echo "$selected_locale UTF-8" >> $INST_MNT/etc/locale.gen
+                echo "LANG=$selected_locale" > $INST_MNT/etc/locale.conf
             fi
         fi
         echo "30"
@@ -116,7 +133,14 @@ finishtouch() {
         echo "en_US.UTF-8 UTF-8" >> $INST_MNT/etc/locale.gen 2>> "$LOG_FILE"
         debug $DEBUG_DEBUG "Running locale-gen"
         artix-chroot $INST_MNT /bin/bash -c locale-gen >> "$LOG_FILE" 2>&1 && echo "100"
-    ) | dialog --gauge "Finalizing base installation..." 10 70 0
+    ) | yad --progress \
+        --title="System Configuration" \
+        --text="Finalizing base installation..." \
+        --width=400 \
+        --height=100 \
+        --auto-close \
+        --auto-kill \
+        --percentage=0
 
     if [[ $? -ne 0 ]]; then
         debug $DEBUG_ERROR "Failed to complete base system configuration"
@@ -157,7 +181,8 @@ prepare_chroot() {
 
     # Start the progress bar
     (
-        echo "10"; sleep 1
+        echo "# Creating installation directories..."
+        echo "10"
         debug $DEBUG_DEBUG "Creating installation directories"
         mkdir -p "$INST_MNT/install/services" >> "$LOG_FILE" 2>&1 || error "Failed to create directories!"
         
@@ -190,7 +215,14 @@ prepare_chroot() {
         debug $DEBUG_DEBUG "Creating environment file"
         echo "TIMEZONE=$TIMEZONE" > "$INST_MNT/install/chroot.env" 2>> "$LOG_FILE" || error "Failed to create environment file!"
         echo "100"
-    ) | dialog --gauge "Preparing chroot environment..." 10 70 0
+    ) | yad --progress \
+        --title="Chroot Preparation" \
+        --text="Preparing chroot environment..." \
+        --width=400 \
+        --height=100 \
+        --auto-close \
+        --auto-kill \
+        --percentage=0
 
     if [[ $? -ne 0 ]]; then
         debug $DEBUG_ERROR "Failed to prepare chroot environment"

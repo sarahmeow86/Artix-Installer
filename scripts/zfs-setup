@@ -1,15 +1,26 @@
 #!/usr/bin/env bash
 
+# YAD helper for progress display
+show_progress_pipe() {
+    yad --progress \
+        --title="ZFS Setup" \
+        --width=400 \
+        --height=100 \
+        --auto-close \
+        --auto-kill \
+        --text="" \
+        --percentage=0
+}
+
 check_existing_pools() {
     debug $DEBUG_INFO "Checking for existing ZFS pools"
-    
-    # Get list of importable pools
     local discovered_pools=$(zpool import | grep "pool:" | cut -d: -f2 | tr -d ' ')
     
     if [[ -n "$discovered_pools" ]]; then
         debug $DEBUG_DEBUG "Found existing pools: $discovered_pools"
-        if dialog --title "Existing ZFS Pools" \
-            --yesno "Found existing ZFS pools:\n\n$discovered_pools\n\nDo you want to import them into the new system?" 12 60; then
+        if yad --title "Existing ZFS Pools" \
+            --text="Found existing ZFS pools:\n\n$discovered_pools\n\nDo you want to import them into the new system?" \
+            --button="No:1" --button="Yes:0"; then
             
             debug $DEBUG_INFO "User chose to import existing pools"
             for pool in $discovered_pools; do
@@ -37,28 +48,24 @@ check_existing_pools() {
 rootpool() {
     debug $DEBUG_INFO "Starting ZFS root pool creation"
     printf "%s\n" "${bold}Creating root pool"
-    dialog --infobox "Starting install, it will take time, so go GRUB a cup of coffee! ;D" 5 50
-    sleep 3
+    yad --title="ZFS Setup" --text="Starting install, it will take time, so go GRUB a cup of coffee! ;D" \
+        --timeout=3 --timeout-indicator=bottom
 
     debug $DEBUG_DEBUG "Using disk: $DISK"
-    debug $DEBUG_DEBUG "Creating ZFS root pool on: ${DISK}-part2"
     debug $DEBUG_DEBUG "Using pool name: $ZFS_POOL_NAME"
 
-    # Start the progress bar
     (
-        echo "10"; sleep 1
-        echo "Creating ZFS root pool..."; sleep 1
+        echo "# Creating ZFS root pool..."
+        echo "10"
         zgenhostid -f
-        debug $DEBUG_DEBUG "Running zpool create command"
+        echo "# Setting up ZFS pool structure..."
+        echo "50"
         zpool create -f -o ashift=12 -o autotrim=on -o compatibility=openzfs-2.1-linux \
             -O acltype=posixacl -O xattr=sa -O relatime=on -O compression=lz4 -m none \
-            -R $INST_MNT "$ZFS_POOL_NAME" "${DISK}-part2" >> "$LOG_FILE" 2>&1 && echo "50"
-        
-        debug $DEBUG_DEBUG "ZFS pool creation completed"
-        sleep 1
-        echo "Finalizing setup..."; sleep 1
+            -R $INST_MNT "$ZFS_POOL_NAME" "${DISK}-part2" >> "$LOG_FILE" 2>&1
+        echo "# Finalizing setup..."
         echo "100"
-    ) | dialog --gauge "Setting up the ZFS root pool..." 10 70 0
+    ) | show_progress_pipe
 
     # Check if the pool was created successfully
     if ! zpool status "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1; then
@@ -74,21 +81,20 @@ createdatasets() {
     debug $DEBUG_INFO "Starting ZFS dataset creation"
     printf "%s\n" "${bold}Creating root and home datasets"
 
-    # Start the progress bar
     (
-        echo "10"; sleep 1
-        echo "Creating os dataset..."; sleep 1
-        debug $DEBUG_DEBUG "Creating os dataset structure"
-        zfs create -o mountpoint=none "$ZFS_POOL_NAME/os" >> "$LOG_FILE" 2>&1 && echo "30"
+        echo "# Creating os dataset..."
+        echo "10"
+        zfs create -o mountpoint=none "$ZFS_POOL_NAME/os" >> "$LOG_FILE" 2>&1
         
-        echo "Creating root filesystem..."; sleep 1
-        debug $DEBUG_DEBUG "Creating root filesystem dataset"
-        zfs create -o mountpoint=/ -o canmount=noauto "$ZFS_POOL_NAME/os/artix" >> "$LOG_FILE" 2>&1 && echo "60"
+        echo "# Creating root filesystem..."
+        echo "30"
+        zfs create -o mountpoint=/ -o canmount=noauto "$ZFS_POOL_NAME/os/artix" >> "$LOG_FILE" 2>&1
         
-        echo "Creating home dataset..."; sleep 1
-        debug $DEBUG_DEBUG "Creating home dataset"
-        zfs create -o mountpoint=/home "$ZFS_POOL_NAME/home" >> "$LOG_FILE" 2>&1 && echo "100"
-    ) | dialog --gauge "Creating ZFS datasets..." 10 70 0
+        echo "# Creating home dataset..."
+        echo "60"
+        zfs create -o mountpoint=/home "$ZFS_POOL_NAME/home" >> "$LOG_FILE" 2>&1
+        echo "100"
+    ) | show_progress_pipe
 
     # Verify datasets
     debug $DEBUG_DEBUG "Verifying created datasets"
@@ -105,25 +111,24 @@ mountall() {
     debug $DEBUG_INFO "Starting ZFS dataset mounting"
     printf "%s\n" "${bold}Mounting datasets"
 
-    # Start the progress bar
     (
-        echo "10"; sleep 1
-        echo "Exporting ZFS pool..."; sleep 1
-        debug $DEBUG_DEBUG "Exporting pool: $ZFS_POOL_NAME"
-        zpool export "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1 && echo "20"
-
-        echo "Importing ZFS pool..."; sleep 1
-        debug $DEBUG_DEBUG "Importing pool with -N flag: $ZFS_POOL_NAME"
-        zpool import -N -R "$INST_MNT" "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1 && echo "30"
-
-        echo "Mounting root dataset..."; sleep 1
-        debug $DEBUG_DEBUG "Mounting root dataset"
-        zfs mount "$ZFS_POOL_NAME/os/artix" >> "$LOG_FILE" 2>&1 && echo "60"
+        echo "# Exporting ZFS pool..."
+        echo "10"
+        zpool export "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1
         
-        echo "Mounting home dataset..."; sleep 1
-        debug $DEBUG_DEBUG "Mounting home dataset"
-        zfs mount "$ZFS_POOL_NAME/home" >> "$LOG_FILE" 2>&1 && echo "100"
-    ) | dialog --gauge "Mounting ZFS datasets..." 10 70 0
+        echo "# Importing ZFS pool..."
+        echo "30"
+        zpool import -N -R "$INST_MNT" "$ZFS_POOL_NAME" >> "$LOG_FILE" 2>&1
+        
+        echo "# Mounting root dataset..."
+        echo "60"
+        zfs mount "$ZFS_POOL_NAME/os/artix" >> "$LOG_FILE" 2>&1
+        
+        echo "# Mounting home dataset..."
+        echo "90"
+        zfs mount "$ZFS_POOL_NAME/home" >> "$LOG_FILE" 2>&1
+        echo "100"
+    ) | show_progress_pipe
 
     # Verify mounts
     debug $DEBUG_DEBUG "Verifying dataset mounts"

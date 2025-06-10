@@ -10,63 +10,92 @@ chaoticaur() {
     debug $DEBUG_INFO "Starting Chaotic AUR installation"
     printf "%s\n" "## Installing Chaotic AUR ##"
 
-    # Start the progress bar
     (
-        echo "10"; sleep 1
-        echo "Receiving key for Chaotic AUR..."; sleep 1
+        echo "# Receiving key for Chaotic AUR..."
+        echo "10"
         debug $DEBUG_DEBUG "Running: pacman-key --recv-key 8A9E14A07010F7E3"
-        pacman-key --recv-key 8A9E14A07010F7E3 >> "$LOG_FILE" 2>&1 && echo "30"
+        pacman-key --recv-key 8A9E14A07010F7E3 >> "$LOG_FILE" 2>&1
         
+        echo "# Signing key..."
+        echo "30"
         debug $DEBUG_DEBUG "Running: pacman-key --lsign-key 8A9E14A07010F7E3"
-        pacman-key --lsign-key 8A9E14A07010F7E3 >> "$LOG_FILE" 2>&1 && echo "50"
+        pacman-key --lsign-key 8A9E14A07010F7E3 >> "$LOG_FILE" 2>&1
         
-        echo "Updating package database..."; sleep 1
+        echo "# Updating package database..."
+        echo "50"
         debug $DEBUG_DEBUG "Running: pacman -Sy"
-        pacman -Sy >> "$LOG_FILE" 2>&1 && echo "70"
+        pacman -Sy >> "$LOG_FILE" 2>&1
         
-        echo "Installing Chaotic AUR keyring..."; sleep 1
+        echo "# Installing Chaotic AUR keyring..."
+        echo "70"
         debug $DEBUG_DEBUG "Installing Chaotic keyring"
-        yes | LC_ALL=en_US.UTF-8 pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' >> "$LOG_FILE" 2>&1 && echo "85"
+        yes | LC_ALL=en_US.UTF-8 pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' >> "$LOG_FILE" 2>&1
         
-        echo "Installing Chaotic AUR mirrorlist..."; sleep 1
+        echo "# Installing Chaotic AUR mirrorlist..."
+        echo "90"
         debug $DEBUG_DEBUG "Installing Chaotic mirrorlist"
-        yes | LC_ALL=en_US.UTF-8 pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' >> "$LOG_FILE" 2>&1 && echo "100"
-    ) | dialog --gauge "Installing Chaotic AUR..." 10 70 0
+        yes | LC_ALL=en_US.UTF-8 pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' >> "$LOG_FILE" 2>&1
+        echo "100"
+    ) | yad --progress \
+        --title="Chaotic AUR Installation" \
+        --text="Installing Chaotic AUR..." \
+        --width=400 \
+        --height=100 \
+        --auto-close \
+        --auto-kill \
+        --percentage=0
 
     if [[ $? -ne 0 ]]; then
-        debug $DEBUG_ERROR "Chaotic AUR installation failed"
+        yad --error \
+            --title="Chaotic AUR Error" \
+            --text="Failed to install Chaotic AUR.\nCheck the logs for details." \
+            --width=300
         error "Error installing Chaotic AUR!"
     fi
 
-    debug $DEBUG_INFO "Chaotic AUR installation completed successfully"
-    printf "%s\n" "${bold}Chaotic AUR installed successfully!"
+    yad --info \
+        --title="Chaotic AUR" \
+        --text="Chaotic AUR installed successfully!" \
+        --width=300
 }
 
 addrepo() {
     debug $DEBUG_INFO "Starting repository configuration"
     printf "%s\n" "## Adding repos to /etc/pacman.conf."
 
-    # Get the path to pacman.conf
     local pacman_conf
     pacman_conf="$(get_script_path "pacman.conf" "misc")"
 
-    # Start the progress bar
     (
-        echo "10"; sleep 1
-        echo "Installing artix-archlinux-support package..."; sleep 1
+        echo "# Installing artix-archlinux-support..."
+        echo "25"
         debug $DEBUG_DEBUG "Running: pacman -Sy --noconfirm artix-archlinux-support"
-        pacman -Sy --noconfirm artix-archlinux-support >> "$LOG_FILE" 2>&1 && echo "50"
+        pacman -Sy --noconfirm artix-archlinux-support >> "$LOG_FILE" 2>&1
         
-        echo "Copying pacman.conf to /etc/..."; sleep 1
+        echo "# Copying pacman.conf..."
+        echo "75"
         debug $DEBUG_DEBUG "Copying pacman.conf to /etc/"
-        cp "$pacman_conf" /etc/ >> "$LOG_FILE" 2>&1 && echo "100"
-    ) | dialog --gauge "Adding repositories to pacman.conf..." 10 70 0
+        cp "$pacman_conf" /etc/ >> "$LOG_FILE" 2>&1
+        echo "100"
+    ) | yad --progress \
+        --title="Repository Configuration" \
+        --text="Configuring repositories..." \
+        --width=400 \
+        --height=100 \
+        --auto-close \
+        --auto-kill \
+        --percentage=0
 
     if [[ $? -ne 0 ]]; then
-        debug $DEBUG_ERROR "Repository configuration failed"
+        yad --error \
+            --title="Repository Error" \
+            --text="Failed to configure repositories.\nCheck the logs for details." \
+            --width=300
         error "Error adding repos!"
     fi
 
-    debug $DEBUG_INFO "Repository configuration completed successfully"
-    printf "%s\n" "${bold}Repositories added successfully!"
+    yad --info \
+        --title="Repository Configuration" \
+        --text="Repositories configured successfully!" \
+        --width=300
 }

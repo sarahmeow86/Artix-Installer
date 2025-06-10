@@ -1,38 +1,54 @@
 #!/usr/bin/env bash
 efiswap() {
     debug $DEBUG_INFO "Setting up EFI and swap partitions"
-    # Show progress dialog while setting up partitions
+    
     (
-        echo "0"
-        echo "Setting up EFI partition..."; sleep 1
+        echo "# Setting up EFI partition..."
+        echo "10"
         debug $DEBUG_DEBUG "Creating EFI filesystem on ${DISK}-part1"
-        mkfs.fat -F 32 "${DISK}-part1" >> "$LOG_FILE" 2>&1 && echo "30"
+        mkfs.fat -F 32 "${DISK}-part1" >> "$LOG_FILE" 2>&1
+        
+        echo "# Mounting EFI partition..."
+        echo "30"
         debug $DEBUG_DEBUG "Mounting EFI partition"
         mkdir -p ${INST_MNT}/boot/efi >> "$LOG_FILE" 2>&1
-        mount "${DISK}-part1" ${INST_MNT}/boot/efi >> "$LOG_FILE" 2>&1 && echo "60"
+        mount "${DISK}-part1" ${INST_MNT}/boot/efi >> "$LOG_FILE" 2>&1
         
+        echo "# Configuring swap partition..."
+        echo "60"
         debug $DEBUG_DEBUG "Setting up swap partition"
         if [[ "$FILESYSTEM" == "zfs" ]]; then
             debug $DEBUG_DEBUG "Setting up swap for ZFS: ${DISK}-part3"
-            echo "Creating swap partition..."; sleep 1
-            mkswap -L SWAP "${DISK}-part3" >> "$LOG_FILE" 2>&1 && echo "70"
-            echo "Activating swap partition..."; sleep 1
-            swapon "${DISK}-part3" >> "$LOG_FILE" 2>&1 && echo "100"
+            mkswap -L SWAP "${DISK}-part3" >> "$LOG_FILE" 2>&1
+            swapon "${DISK}-part3" >> "$LOG_FILE" 2>&1
         else
             debug $DEBUG_DEBUG "Setting up swap for traditional filesystem: ${DISK}-part4"
-            echo "Creating swap partition..."; sleep 1
-            mkswap -L SWAP "${DISK}-part4" >> "$LOG_FILE" 2>&1 && echo "70"
-            echo "Activating swap partition..."; sleep 1
-            swapon "${DISK}-part4" >> "$LOG_FILE" 2>&1 && echo "80"
+            mkswap -L SWAP "${DISK}-part4" >> "$LOG_FILE" 2>&1
+            swapon "${DISK}-part4" >> "$LOG_FILE" 2>&1
         fi
-    ) | dialog --gauge "Setting up partitions..." 10 70 0
+        echo "100"
+    ) | yad --progress \
+        --title="Partition Setup" \
+        --text="Setting up EFI and swap partitions..." \
+        --width=400 \
+        --height=100 \
+        --auto-close \
+        --auto-kill \
+        --percentage=0
 
     # Verify mounts
     debug $DEBUG_DEBUG "Verifying partition mounts"
     if ! mountpoint -q "${INST_MNT}/boot/efi"; then
-        debug $DEBUG_ERROR "EFI partition not mounted"
+        yad --error \
+            --title="Mount Error" \
+            --text="Failed to mount EFI partition!" \
+            --width=300
         error "Failed to mount EFI partition!"
     fi
 
+    yad --info \
+        --title="Partition Setup" \
+        --text="EFI and swap setup completed successfully" \
+        --width=300
     debug $DEBUG_INFO "EFI and swap setup completed successfully"
 }

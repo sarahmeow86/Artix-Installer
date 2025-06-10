@@ -31,23 +31,28 @@ partdrive() {
         fi
         debug $DEBUG_DEBUG "RAM: ${RAM_SIZE}GB, Recommended swap: ${RECOMMENDED_SWAP}GB"
 
-        # Prompt for swap size with recommended value
         while true; do
             debug $DEBUG_DEBUG "Prompting for swap size"
-            SWAP_SIZE=$(dialog --clear --title "Swap Partition Size" \
-                --inputbox "Enter the size of the swap partition in GB\nRecommended size: ${RECOMMENDED_SWAP}GB\nAvailable disk space: ${DISK_SIZE}GB" \
-                12 60 "$RECOMMENDED_SWAP" 3>&1 1>&2 2>&3)
-        
-            if [[ -n "$SWAP_SIZE" && $(echo "$SWAP_SIZE" | grep -E '^[0-9]+$') && "$SWAP_SIZE" -lt "$DISK_SIZE" ]]; then
+            SWAP_SIZE=$(yad --form \
+                --title="Swap Configuration" \
+                --text="<b>Configure Swap Partition</b>\nRecommended size: ${RECOMMENDED_SWAP}GB\nAvailable disk space: ${DISK_SIZE}GB" \
+                --field="Swap size (GB):NUM" "$RECOMMENDED_SWAP!1..${DISK_SIZE}!1" \
+                --width=400 \
+                --separator="" \
+                --button="Cancel:1" \
+                --button="OK:0")
+            
+            if [[ $? -eq 0 && -n "$SWAP_SIZE" && "$SWAP_SIZE" -lt "$DISK_SIZE" ]]; then
                 debug $DEBUG_INFO "User selected swap size: ${SWAP_SIZE}GB"
                 break
             else
                 debug $DEBUG_WARN "Invalid swap size entered"
-                dialog --title "Invalid Input" --msgbox "Invalid swap size! Please enter a positive integer less than ${DISK_SIZE}." 10 50
+                yad --error \
+                    --title="Invalid Input" \
+                    --text="Invalid swap size! Please enter a value between 1 and ${DISK_SIZE}." \
+                    --width=300
             fi
         done
-    else
-        debug $DEBUG_INFO "Using provided swap size: ${SWAP_SIZE}GB"
     fi
 
     # Calculate remaining space after EFI (1GB) and swap
@@ -56,48 +61,63 @@ partdrive() {
 
     # Start partitioning
     (
-        echo "10"; sleep 1
+        echo "# Wiping disk..."
+        echo "10"
         debug $DEBUG_DEBUG "Wiping disk: $DISK"
-        echo "Wiping disk..."; sleep 1
-        sgdisk --zap-all "$DISK" >> "$LOG_FILE" 2>&1 && echo "20"
-
+        sgdisk --zap-all "$DISK" >> "$LOG_FILE" 2>&1
+        
+        echo "# Creating EFI partition..."
+        echo "30"
         debug $DEBUG_DEBUG "Creating EFI partition (1GB)"
-        echo "Creating EFI partition..."; sleep 1
-        sgdisk -n1:0:+1G -t1:EF00 "$DISK" >> "$LOG_FILE" 2>&1 && echo "40"
-
+        sgdisk -n1:0:+1G -t1:EF00 "$DISK" >> "$LOG_FILE" 2>&1
+        
         if [[ "$FILESYSTEM" == "zfs" ]]; then
-            debug $DEBUG_DEBUG "Creating ZFS partition"
-            echo "Creating ZFS partition..."; sleep 1
-            sgdisk -n2:0:-${SWAP_SIZE}G -t2:BF00 "$DISK" >> "$LOG_FILE" 2>&1 && echo "60"
+            echo "# Creating ZFS partition..."
+            echo "50"
+            sgdisk -n2:0:-${SWAP_SIZE}G -t2:BF00 "$DISK" >> "$LOG_FILE" 2>&1
         else
-            # Calculate root partition size (40% of remaining space)
+            echo "# Creating root partition..."
+            echo "50"
             ROOT_SIZE=$(( REMAINING_SPACE * 40 / 100 ))
-            debug $DEBUG_DEBUG "Creating root partition (${ROOT_SIZE}GB)"
-            echo "Creating root partition..."; sleep 1
-            sgdisk -n2:0:+${ROOT_SIZE}G -t2:8300 "$DISK" >> "$LOG_FILE" 2>&1 && echo "60"
+            sgdisk -n2:0:+${ROOT_SIZE}G -t2:8300 "$DISK" >> "$LOG_FILE" 2>&1
             
-            debug $DEBUG_DEBUG "Creating home partition"
-            echo "Creating home partition..."; sleep 1
-            sgdisk -n3:0:-${SWAP_SIZE}G -t3:8300 "$DISK" >> "$LOG_FILE" 2>&1 && echo "80"
+            echo "# Creating home partition..."
+            echo "70"
+            sgdisk -n3:0:-${SWAP_SIZE}G -t3:8300 "$DISK" >> "$LOG_FILE" 2>&1
         fi
-
-        debug $DEBUG_DEBUG "Creating swap partition (${SWAP_SIZE}GB)"
-        echo "Creating swap partition..."; sleep 1
+        
+        echo "# Creating swap partition..."
+        echo "90"
         if [[ "$FILESYSTEM" == "zfs" ]]; then
-            sgdisk -n3:0:0 -t3:8308 "$DISK" >> "$LOG_FILE" 2>&1 && echo "90"
+            sgdisk -n3:0:0 -t3:8308 "$DISK" >> "$LOG_FILE" 2>&1
         else
-            sgdisk -n4:0:0 -t4:8308 "$DISK" >> "$LOG_FILE" 2>&1 && echo "90"
+            sgdisk -n4:0:0 -t4:8308 "$DISK" >> "$LOG_FILE" 2>&1
         fi
-
-        debug $DEBUG_DEBUG "Running partprobe"
-        partprobe >> "$LOG_FILE" 2>&1 && echo "100"
-    ) | dialog --gauge "Partitioning drive..." 10 70 0
+        
+        echo "# Updating partition table..."
+        echo "100"
+        partprobe >> "$LOG_FILE" 2>&1
+    ) | yad --progress \
+        --title="Disk Partitioning" \
+        --text="Partitioning drive..." \
+        --width=400 \
+        --height=100 \
+        --auto-close \
+        --auto-kill \
+        --percentage=0
 
     if [[ $? -ne 0 ]]; then
-        debug $DEBUG_ERROR "Partitioning failed"
+        yad --error \
+            --title="Partitioning Error" \
+            --text="Failed to partition drive!\nCheck the logs for details." \
+            --width=300
         error "Failed to partition drive!"
     fi
 
+    yad --info \
+        --title="Partitioning Complete" \
+        --text="Drive partitioning completed successfully!" \
+        --width=300
+    
     debug $DEBUG_INFO "Partitioning completed successfully"
-    printf "%s\n" "${bold}Partitioning completed successfully!"
 }
