@@ -96,13 +96,11 @@ selectdisk() {
             device="/dev/disk/by-id/$disk"
             size=$(lsblk -dno SIZE "$device" 2>/dev/null)
             model=$(lsblk -dno MODEL "$device" 2>/dev/null)
-            # Clean disk name from any trailing characters
-            disk=$(echo "$disk" | tr -d '\n\r')
-            disk_data+="FALSE\n$disk\n$size\n$model\n"
+            disk_data+="FALSE\n${disk%[[:space:]]*}\n$size\n$model\n"
         fi
     done < <(ls -1 /dev/disk/by-id)
 
-    selected=$(echo -e "$disk_data" | yad --list \
+    selected=$(printf '%b' "$disk_data" | yad --list \
         --title="Disk Selection" \
         --text="<span color='red'><b>WARNING: THIS WILL DELETE EVERYTHING ON THE SELECTED DRIVE!</b></span>" \
         --width=800 \
@@ -119,9 +117,11 @@ selectdisk() {
     [[ $? -eq 1 ]] && error "Disk selection cancelled"
     [[ -z "$selected" ]] && error "No disk selected!"
 
-    # Clean selected disk name
-    selected=$(echo "$selected" | tr -d '\n\r')
-    DISK="/dev/disk/by-id/${selected}"
+    # Clean the selected disk name to remove any extra characters
+    selected=${selected%[[:space:]]*}
+    selected=${selected//[^[:alnum:]_-]/}
+    DISK="/dev/disk/by-id/$selected"
+    
     debug $DEBUG_INFO "Disk selected: $DISK"
     
     # Show confirmation with full device details
