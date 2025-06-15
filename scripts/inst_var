@@ -89,41 +89,38 @@ selectdisk() {
 
     debug $DEBUG_DEBUG "Generating disk list"
     
-    # Get list of physical disks only
+    # Create formatted disk list with multiple columns
     disk_data=""
     while read -r disk; do
-        # Skip if not a physical disk
-        [[ ! -b "$disk" ]] && continue
-        [[ "$disk" =~ "part" ]] && continue
-        
-        # Get disk details safely
-        if size=$(lsblk -dno SIZE "$disk" 2>/dev/null) && \
-           model=$(lsblk -dno MODEL "$disk" 2>/dev/null) && \
-           [[ -n "$size" ]]; then
-            name=$(basename "$disk")
-            disk_data+="FALSE\n$name\n$size\n$model\n"
+        if [[ "$disk" != *"part"* ]]; then
+            device="/dev/disk/by-id/$disk"
+            size=$(lsblk -dno SIZE "$device" 2>/dev/null)
+            model=$(lsblk -dno MODEL "$device" 2>/dev/null)
+            disk_data+="FALSE|$disk|$size|$model\n"
         fi
-    done < <(find /dev/disk/by-id -type l ! -name '*-part*' 2>/dev/null)
-
-    [[ -z "$disk_data" ]] && error "No valid disks found!"
+    done < <(ls -1 /dev/disk/by-id)
 
     selected=$(echo -e "$disk_data" | yad --list \
         --title="Disk Selection" \
-        --text="<span color='red'><b>WARNING: THIS WILL DELETE EVERYTHING ON THE SELECTED DRIVE!</b></span>\nSelect a disk to install Artix:" \
+        --text="<span color='red'><b>WARNING: THIS WILL DELETE EVERYTHING ON THE SELECTED DRIVE!</b></span>" \
         --width=800 \
         --height=400 \
         --column="Select:RD" \
         --column="Device" \
         --column="Size" \
         --column="Model" \
-        --separator="" \
+        --separator="|" \
+        --print-column=2 \
+        --radiolist \
         --button="Cancel:1" \
         --button="Select:0")
 
     [[ $? -eq 1 ]] && error "Disk selection cancelled"
     [[ -z "$selected" ]] && error "No disk selected!"
 
-    DISK="/dev/disk/by-id/${selected}"
+    # Clean up the selected disk name to remove TRUE and :1 suffix
+    selected=$(echo "$selected" | sed 's/^TRUE//;s/:1$//')
+    DISK="/dev/disk/by-id/$selected"
     
     # Verify disk exists and is block device
     [[ ! -b "$DISK" ]] && error "Selected disk $DISK is not a valid block device!"
