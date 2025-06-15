@@ -1,71 +1,51 @@
 #!/usr/bin/env bash
 installtz() {
     debug $DEBUG_INFO "Starting timezone configuration"
+    printf "%s\n" "${bold}## Setting install variables"
 
     debug $DEBUG_DEBUG "Generating region list"
-    region_list=$(find /usr/share/zoneinfo -mindepth 1 -maxdepth 1 -type d | sed 's|/usr/share/zoneinfo/||' | sort)
+    region_list=$(find /usr/share/zoneinfo -mindepth 1 -maxdepth 1 -type d -printf "%f\n" | sort)
 
     # Create region selection list
-    region_data=""
-    for region in $region_list; do
-        region_data+="$region!"
-    done
-    region_data=${region_data%!}
-
-    region=$(yad --list \
+    region=$(echo "$region_list" | yad --list \
         --title="Region Selection" \
         --text="Select your region:" \
         --width=400 \
         --height=400 \
         --column="Region" \
+        --search-column=1 \
         --separator="" \
         --button="Cancel:1" \
-        --button="Select:0" \
-        ${region_data})
+        --button="Next:0")
 
-    if [[ -z "$region" ]]; then
-        yad --error \
-            --title="Error" \
-            --text="No region selected!" \
-            --width=300
-        error "No region selected!"
-    fi
-
+    [[ -z "$region" ]] && error "No region selected!"
     debug $DEBUG_DEBUG "Selected region: $region"
+
+    # Get cities for selected region
     debug $DEBUG_DEBUG "Generating city list for region: $region"
-    city_list=$(find "/usr/share/zoneinfo/$region" -type f | sed "s|/usr/share/zoneinfo/$region/||" | sort)
+    city_list=$(find "/usr/share/zoneinfo/$region" -type f -printf "%f\n" | sort)
 
     # Create city selection list
-    city_data=""
-    for city in $city_list; do
-        city_data+="$city!"
-    done
-    city_data=${city_data%!}
-
-    city=$(yad --list \
+    city=$(echo "$city_list" | yad --list \
         --title="City Selection" \
         --text="Select your city in $region:" \
         --width=400 \
         --height=400 \
         --column="City" \
+        --search-column=1 \
         --separator="" \
-        --button="Cancel:1" \
-        --button="Select:0" \
-        ${city_data})
+        --button="Back:2" \
+        --button="Select:0")
 
-    if [[ -z "$city" ]]; then
-        yad --error \
-            --title="Error" \
-            --text="No city selected!" \
-            --width=300
-        error "No city selected!"
-    fi
-
+    [[ $? -eq 2 ]] && exec "$0" # Restart script if Back is clicked
+    [[ -z "$city" ]] && error "No city selected!"
+    
     INST_TZ="/usr/share/zoneinfo/$region/$city"
     debug $DEBUG_INFO "Timezone set to: $region/$city"
+    
     yad --info \
         --title="Timezone Selection" \
-        --text="Selected timezone: $region/$city" \
+        --text="Timezone set to: $region/$city" \
         --width=300
 }
 
@@ -81,12 +61,10 @@ installkrn() {
         --column="Select" \
         --column="Kernel" \
         --column="Description" \
-        TRUE "linux" "Standard kernel" \
-        FALSE "linux-zen" "Zen kernel" \
+        TRUE "linux-zen" "Zen kernel" \
         FALSE "linux-lts" "Long-term support")
 
     case $selected in
-        linux*) INST_LINVAR="linux" ;;
         *zen*) INST_LINVAR="linux-zen" ;;
         *lts*) INST_LINVAR="linux-lts" ;;
         *) 
@@ -110,27 +88,31 @@ selectdisk() {
     printf "%s\n" "${bold}## Decide which disk you want to use"
 
     debug $DEBUG_DEBUG "Generating disk list"
-    disk_list=$(ls -1 /dev/disk/by-id | grep -v -- "-part[0-9]")
-
-    # Create disk selection list for YAD
+    
+    # Create formatted disk list with multiple columns
     disk_data=""
-    for disk in $disk_list; do
-        size=$(lsblk -dno SIZE /dev/disk/by-id/"$disk" 2>/dev/null)
-        disk_data+="$disk!$size!"
-    done
-    disk_data=${disk_data%!}  # Remove trailing delimiter
+    while read -r disk; do
+        if [[ "$disk" != *"part"* ]]; then
+            device="/dev/disk/by-id/$disk"
+            size=$(lsblk -dno SIZE "$device" 2>/dev/null)
+            model=$(lsblk -dno MODEL "$device" 2>/dev/null)
+            disk_data+="FALSE\n$disk\n$size\n$model\n"
+        fi
+    done < <(ls -1 /dev/disk/by-id)
 
-    selected=$(yad --list \
+    selected=$(echo -e "$disk_data" | yad --list \
         --title="Disk Selection" \
-        --text="<b>WARNING: THIS WILL DELETE EVERYTHING ON THE SELECTED DRIVE!</b>" \
-        --width=600 \
+        --text="<span color='red'><b>WARNING: THIS WILL DELETE EVERYTHING ON THE SELECTED DRIVE!</b></span>" \
+        --width=800 \
         --height=400 \
-        --column="Disk" \
+        --column="Select:CHK" \
+        --column="Device" \
         --column="Size" \
+        --column="Model" \
+        --radiolist \
         --separator="" \
         --button="Cancel:1" \
-        --button="Select:0" \
-        ${disk_data})
+        --button="Select:0")
 
     if [[ -z "$selected" ]]; then
         yad --error \
@@ -142,8 +124,12 @@ selectdisk() {
 
     DISK="/dev/disk/by-id/${selected}"
     debug $DEBUG_INFO "Disk selected: $DISK"
+    
+    # Show confirmation with full device details
+    size=$(lsblk -dno SIZE "$DISK" 2>/dev/null)
+    model=$(lsblk -dno MODEL "$DISK" 2>/dev/null)
     yad --info \
         --title="Disk Selection" \
-        --text="Selected disk: ${selected}" \
-        --width=300
+        --text="Selected disk:\n\nDevice: ${selected}\nSize: ${size}\nModel: ${model}" \
+        --width=400
 }

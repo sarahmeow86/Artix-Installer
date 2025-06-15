@@ -7,7 +7,7 @@ installpkgs() {
     local pkglist
     local zfs_openrc
     pkglist="$(get_script_path "pkglist.txt" "misc")"
-    zfs_openrc="$(get_script_path "zfs-openrc-*.pkg.tar.zst" "misc")"
+    zfs_openrc="$(get_script_path "zfs-openrc.pkg.tar.zst" "misc")"
 
     # Start the progress bar
     (

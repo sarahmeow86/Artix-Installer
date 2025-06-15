@@ -13,11 +13,21 @@ choose_filesystem() {
         FALSE "btrfs" "Modern CoW filesystem" \
         FALSE "xfs" "High-performance filesystem" \
         FALSE "zfs" "Advanced storage platform" \
+        --print-column=2 \
         --separator="" \
         --button="Cancel:1" \
         --button="Select:0")
 
-    [[ -z "$FILESYSTEM" ]] && error "No filesystem selected!"
+    # Validate selection
+    case "$FILESYSTEM" in
+        ext4|btrfs|xfs|zfs) 
+            debug $DEBUG_INFO "Valid filesystem selected: $FILESYSTEM"
+            ;;
+        *)
+            debug $DEBUG_ERROR "Invalid or no filesystem selected"
+            error "No valid filesystem selected!"
+            ;;
+    esac
     
     yad --info \
         --title="Filesystem Selection" \

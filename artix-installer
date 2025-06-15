@@ -215,13 +215,29 @@ check_swap() {
     fi
 }
 
-# Check for yad
+# Check for required packages
 debug $DEBUG_INFO "Checking for required packages"
-if ! command -v yad &> /dev/null; then
-    debug $DEBUG_WARN "yad not found, attempting installation"
-    pacman -Sy --noconfirm yad gptfdisk || {
+required_pkgs=(yad xorg-xwininfo gptfdisk python-websockets)
+missing_pkgs=()
+
+# Special handling for Python package
+if ! python -c "import websockets" &>/dev/null; then
+    debug $DEBUG_WARN "Python websockets module not found"
+    missing_pkgs+=("python-websockets")
+fi
+
+for pkg in "${required_pkgs[@]}"; do
+    if ! command -v "${pkg%%-*}" &> /dev/null; then
+        debug $DEBUG_WARN "$pkg not found"
+        missing_pkgs+=("$pkg")
+    fi
+done
+
+if [[ ${#missing_pkgs[@]} -gt 0 ]]; then
+    debug $DEBUG_WARN "Installing missing packages: ${missing_pkgs[*]}"
+    pacman -Sy --noconfirm "${missing_pkgs[@]}" || {
         debug $DEBUG_ERROR "Failed to install required packages"
-        error "Failed to install yad. Please install it manually."
+        error "Failed to install required packages. Please install them manually: ${missing_pkgs[*]}"
     }
 fi
 
@@ -265,7 +281,7 @@ validate_swap_size() {
 }
 
 validate_kernel() {
-    local valid_kernels=("linux" "linux-zen" "linux-lts")
+    local valid_kernels=("linux-zen" "linux-lts")
     local kernel="$1"
 
     for valid_kernel in "${valid_kernels[@]}"; do
@@ -301,7 +317,7 @@ Options:
                            0: Off, 1: Error, 2: Warning, 3: Info, 4: Debug
     -d, --disk DEVICE      Specify the installation disk device (must use /dev/disk/by-id/ format)
     -f, --filesystem FS    Specify filesystem type (ext4, btrfs, zfs, xfs)
-    -k, --kernel KERNEL    Specify kernel to install (linux, linux-zen, linux-lts)
+    -k, --kernel KERNEL    Specify additional kernel to install (linux-zen, linux-lts)
     -l, --locale LOCALE    Specify system locale (e.g., "en_US.UTF-8")
     -p, --pool-name NAME   Specify ZFS pool name (forces ZFS filesystem)
     -t, --timezone ZONE    Specify timezone (e.g., "Europe/Rome")
@@ -447,7 +463,7 @@ while [[ $# -gt 0 ]]; do
                 if validate_kernel "$2"; then
                     INST_LINVAR="$2"
                 else
-                    error "Invalid kernel: $2. Valid options are: linux, linux-zen, linux-lts"
+                    error "Invalid kernel: $2. Valid options are: linux-zen, linux-lts"
                 fi
                 shift 2
             else

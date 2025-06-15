@@ -3,7 +3,8 @@
 get_disk_size() {
     local disk_path=$1
     debug $DEBUG_DEBUG "Getting disk size for: $disk_path"
-    local size=$(lsblk -b -n -d -o SIZE "$disk_path")
+    local real_device=$(readlink -f "$disk_path")
+    local size=$(lsblk -bdn -o SIZE "$real_device")
     local size_gb=$(( size / 1024 / 1024 / 1024 ))
     debug $DEBUG_DEBUG "Disk size: ${size_gb}GB"
     echo $size_gb
@@ -33,24 +34,28 @@ partdrive() {
 
         while true; do
             debug $DEBUG_DEBUG "Prompting for swap size"
-            SWAP_SIZE=$(yad --form \
+            swap_input=$(yad --form \
                 --title="Swap Configuration" \
-                --text="<b>Configure Swap Partition</b>\nRecommended size: ${RECOMMENDED_SWAP}GB\nAvailable disk space: ${DISK_SIZE}GB" \
-                --field="Swap size (GB):NUM" "$RECOMMENDED_SWAP!1..${DISK_SIZE}!1" \
+                --text="<b>Configure Swap Partition</b>\n\nRecommended size: ${RECOMMENDED_SWAP}GB\nAvailable disk space: ${DISK_SIZE}GB" \
+                --field="Swap size (GB)" "$RECOMMENDED_SWAP" \
                 --width=400 \
                 --separator="" \
                 --button="Cancel:1" \
                 --button="OK:0")
             
-            if [[ $? -eq 0 && -n "$SWAP_SIZE" && "$SWAP_SIZE" -lt "$DISK_SIZE" ]]; then
+            SWAP_SIZE=$(echo "$swap_input" | tr -d '[:space:]')
+            
+            if [[ $? -eq 0 && "$SWAP_SIZE" =~ ^[0-9]+$ ]] && \
+               (( SWAP_SIZE >= 1 && SWAP_SIZE < DISK_SIZE )); then
                 debug $DEBUG_INFO "User selected swap size: ${SWAP_SIZE}GB"
                 break
             else
-                debug $DEBUG_WARN "Invalid swap size entered"
+                debug $DEBUG_WARN "Invalid swap size entered: $SWAP_SIZE"
                 yad --error \
                     --title="Invalid Input" \
-                    --text="Invalid swap size! Please enter a value between 1 and ${DISK_SIZE}." \
+                    --text="Please enter a valid number between 1 and $((DISK_SIZE-1))." \
                     --width=300
+                continue
             fi
         done
     fi

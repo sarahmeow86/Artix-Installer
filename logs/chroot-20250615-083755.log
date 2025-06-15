@@ -1,0 +1,7 @@
+[INFO]  [2025-06-15 08:37:55] Script initialization complete
+[INFO]  [2025-06-15 08:37:55] Starting main installation process
+[INFO]  [2025-06-15 08:37:55] Starting desktop environment selection
+[INFO]  [2025-06-15 08:38:01] Installing packages for cinnamon
+[ERROR] [2025-06-15 08:38:03] Package installation failed
+[ERROR] [2025-06-15 08:38:03] Failed to install packages!
+[ERROR] [2025-06-15 08:38:16] No hostname provided!

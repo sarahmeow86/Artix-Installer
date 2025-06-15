@@ -10,7 +10,7 @@ installzfs() {
 
     # Get path for ZFS OpenRC package
     local zfs_openrc
-    zfs_openrc="$(get_script_path "zfs-openrc-*.pkg.tar.zst" "misc")"
+    zfs_openrc="$(get_script_path "zfs-openrc.pkg.tar.zst" "misc")"
 
     # Start the progress bar with YAD
     (

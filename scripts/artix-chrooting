@@ -54,26 +54,21 @@ error() {
     exit 1
 }
 
+is_chroot() {
+    [[ "$(stat -c %d:%i /)" != "$(stat -c %d:%i /proc/1/root/.)" ]]
+}
+
 select_desktop_environment() {
     debug $DEBUG_INFO "Starting desktop environment selection"
     
-    DE_CHOICE=$(yad --list \
-        --title="Desktop Environment Selection" \
-        --text="Choose a desktop environment to install:" \
-        --width=400 \
-        --height=300 \
-        --radiolist \
-        --column="Select" \
-        --column="ID" \
-        --column="Environment" \
-        TRUE 1 "Base (No Desktop Environment)" \
-        FALSE 2 "Cinnamon" \
-        FALSE 3 "MATE" \
-        FALSE 4 "KDE Plasma" \
-        FALSE 5 "LXQt" \
-        FALSE 6 "XFCE" \
-        --separator="" \
-        --print-column=2)
+    DE_CHOICE=$(whiptail --clear --title "Desktop Environment Selection" \
+        --menu "Choose a desktop environment to install:" 15 50 6 \
+        1 "Base (No Desktop Environment)" \
+        2 "Cinnamon" \
+        3 "MATE" \
+        4 "KDE Plasma" \
+        5 "LXQt" \
+        6 "XFCE" 3>&1 1>&2 2>&3)
 
     [[ -z "$DE_CHOICE" ]] && error "No desktop environment selected!"
 
@@ -112,25 +107,17 @@ select_desktop_environment() {
     # Install packages
     if [[ -f "/install/$PKGLIST" ]]; then
         debug $DEBUG_INFO "Installing packages for $DE"
-        (
-            echo "# Installing packages for $DE..."
+        {
             echo "10"
             debug $DEBUG_DEBUG "Running pacman to install packages"
-            if pacman -Sy --noconfirm - < "/install/$PKGLIST"; then
+            if pacman -Sy --noconfirm - < "/install/$PKGLIST" >/dev/null 2>&4; then
                 debug $DEBUG_INFO "Package installation completed successfully"
                 echo "100"
             else
                 debug $DEBUG_ERROR "Package installation failed"
                 error "Failed to install packages!"
             fi
-        ) | yad --progress \
-            --title="Package Installation" \
-            --text="Installing $DE packages..." \
-            --width=400 \
-            --height=100 \
-            --auto-close \
-            --auto-kill \
-            --percentage=0
+        } | whiptail --gauge "Installing $DE packages..." 10 70 0
     else
         error "Package list file not found!"
     fi
@@ -176,8 +163,8 @@ install_grub() {
         debug $DEBUG_INFO "Found ZFS pool name: $ZFS_POOL_NAME"
     fi
 
-    dialog --infobox "Installing and configuring GRUB bootloader..." 5 50 >&3
-    (
+    whiptail --infobox "Installing and configuring GRUB bootloader..." 5 50
+    {
         echo "10" >&3; sleep 1
         debug $DEBUG_INFO "Installing GRUB packages"
         echo "Installing GRUB and related packages..." >&3
@@ -236,9 +223,9 @@ install_grub() {
                 fi
             done
         fi
-    ) | dialog --gauge "Installing GRUB bootloader..." 10 70 0 >&3
+    } | whiptail --gauge "Installing GRUB bootloader..." 10 70 0
 
-    dialog --msgbox "GRUB has been installed and configured successfully!" 10 50 >&3
+    whiptail --msgbox "GRUB has been installed and configured successfully!" 10 50
 }
 
 regenerate_initcpio() {
@@ -280,19 +267,17 @@ configure_bootloader() {
 USERADD() {
     debug $DEBUG_INFO "Creating user account"
     
-    user_info=$(yad --form \
-        --title="Create User Account" \
-        --text="Enter user account details:" \
-        --field="Username" \
-        --field="Password:H" \
-        --field="Sudo privileges:CHK" \
-        --width=400)
+    username=$(whiptail --clear --title "Create User Account" \
+        --inputbox "Enter username:" 8 40 3>&1 1>&2 2>&3)
+    [[ -z "$username" ]] && error "No username provided!"
     
-    [[ -z "$user_info" ]] && error "No user information provided!"
+    password=$(whiptail --clear --title "Create User Account" \
+        --passwordbox "Enter password for $username:" 8 40 3>&1 1>&2 2>&3)
+    [[ -z "$password" ]] && error "No password provided!"
     
-    username=$(echo "$user_info" | cut -d'|' -f1)
-    password=$(echo "$user_info" | cut -d'|' -f2)
-    sudo_priv=$(echo "$user_info" | cut -d'|' -f3)
+    whiptail --clear --title "Sudo Access" \
+        --yesno "Grant sudo privileges to $username?" 8 40 3>&1 1>&2 2>&3
+    sudo_priv=$?  # 0 for yes, 1 for no
 
     debug $DEBUG_INFO "Adding user $username"
     if ! useradd -m -G log,network,scanner,power,users,video,storage,optical,lp,audio "$username" >/dev/null 2>&4; then
@@ -331,17 +316,12 @@ USERADD() {
 passwdroot() {
     debug $DEBUG_INFO "Setting root password"
     
-    root_pass=$(yad --form \
-        --title="Set Root Password" \
-        --text="Enter root password:" \
-        --field="Password:H" \
-        --field="Confirm Password:H" \
-        --width=400)
+    password=$(whiptail --clear --title "Root Password" \
+        --passwordbox "Enter root password:" 8 40 3>&1 1>&2 2>&3)
+    [[ -z "$password" ]] && error "No password provided!"
     
-    [[ -z "$root_pass" ]] && error "No root password provided!"
-    
-    password=$(echo "$root_pass" | cut -d'|' -f1)
-    confirm=$(echo "$root_pass" | cut -d'|' -f2)
+    confirm=$(whiptail --clear --title "Root Password" \
+        --passwordbox "Confirm root password:" 8 40 3>&1 1>&2 2>&3)
     
     [[ "$password" != "$confirm" ]] && error "Passwords do not match!"
 
@@ -426,11 +406,8 @@ main() {
     
     select_desktop_environment || error "Error selecting desktop environment!"
 
-    hostname=$(yad --form \
-        --title="Hostname Configuration" \
-        --text="Enter system hostname:" \
-        --field="Hostname" \
-        --width=400)
+    hostname=$(whiptail --clear --title "Hostname Configuration" \
+        --inputbox "Enter system hostname:" 8 40 3>&1 1>&2 2>&3)
     
     [[ -z "$hostname" ]] && error "No hostname provided!"
 
@@ -448,10 +425,7 @@ main() {
     set_timezone || error "Error setting timezone!"
 
     debug $DEBUG_INFO "Installation completed successfully"
-    yad --info \
-        --title="Installation Complete" \
-        --text="<b>Installation Completed!</b>\n\nThe installation process has been completed successfully." \
-        --width=400
+    whiptail --msgbox "Installation completed successfully!" 10 50
 }
 
 debug $DEBUG_INFO "Script initialization complete"

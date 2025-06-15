@@ -155,56 +155,71 @@ prepare_chroot() {
     debug $DEBUG_INFO "Starting chroot environment preparation"
     printf "%s\n" "${bold}Preparing chroot environment"
 
-    # Get paths for required files
-    local pkglists
-    local services_dir
-    local zfs_openrc
-    local chroot_script
+    # Get base paths first
+    local misc_dir
+    misc_dir=$(dirname "$(get_script_path "pacman.conf" "misc")") || error "Failed to find misc directory"
+    debug $DEBUG_DEBUG "Misc directory: $misc_dir"
+
+    # Get required paths
+    local services_dir="$misc_dir/services"
+    local chroot_script=$(get_script_path "artix-chrooting" "scripts")
     
-    # Initialize paths with proper error checking
-    pkglists=$(get_script_path "pkglist-*.txt" "misc") || error "Failed to find package list"
-    services_dir=$(get_script_path "services" "misc") || error "Failed to find services directory"
-    chroot_script=$(get_script_path "artix-chrooting" "scripts") || error "Failed to find chroot script"
-    zfs_openrc=$(get_script_path "zfs-openrc-20241023-1-any.pkg.tar.zst" "misc") || error "Failed to find ZFS OpenRC package"
+    # Find ZFS OpenRC package
+    local zfs_openrc
+    zfs_openrc=$(find "$misc_dir" -name "zfs-openrc.pkg.tar.zst" -type f | head -n 1)
+    
+    if [[ -n "$zfs_openrc" ]]; then
+        debug $DEBUG_DEBUG "Found ZFS OpenRC package: $zfs_openrc"
+    else
+        debug $DEBUG_ERROR "ZFS OpenRC package not found in $misc_dir"
+        debug $DEBUG_DEBUG "Files in misc_dir: $(ls -la "$misc_dir")"
+        error "ZFS OpenRC package not found. Please ensure zfs-openrc.pkg.tar.zst exists in the misc directory."
+    fi
 
-    # Verify paths exist before proceeding
-    debug $DEBUG_DEBUG "Verifying paths..."
-    debug $DEBUG_DEBUG "Package lists: $pkglists"
-    debug $DEBUG_DEBUG "Services dir: $services_dir"
-    debug $DEBUG_DEBUG "Chroot script: $chroot_script"
-    debug $DEBUG_DEBUG "ZFS OpenRC package: $zfs_openrc"
+    # Validate paths
+    [[ ! -d "$services_dir" ]] && error "Services directory not found: $services_dir"
+    [[ ! -f "$chroot_script" ]] && error "Chroot script not found: $chroot_script"
+    [[ ! -f "$zfs_openrc" ]] && error "ZFS OpenRC package not found in $misc_dir"
 
-    [ ! -f "$pkglists" ] && error "Package list not found at: $pkglists"
-    [ ! -f "$chroot_script" ] && error "Chroot script not found at: $chroot_script"
-    [ ! -d "$services_dir" ] && error "Services directory not found at: $services_dir"
-    [ ! -f "$zfs_openrc" ] && error "ZFS OpenRC package not found at: $zfs_openrc"
+    # Check for package lists
+    local pkglists=()
+    while read -r pkglist; do
+        pkglists+=("$pkglist")
+    done < <(find "$misc_dir" -name "pkglist-*.txt" 2>/dev/null)
+
+    if [[ ${#pkglists[@]} -eq 0 ]]; then
+        debug $DEBUG_ERROR "No package lists found in $misc_dir"
+        error "No package lists found!"
+    fi
+
+    debug $DEBUG_DEBUG "Found ${#pkglists[@]} package lists"
+    for list in "${pkglists[@]}"; do
+        debug $DEBUG_DEBUG "Package list found: $(basename "$list")"
+    done
 
     # Start the progress bar
     (
         echo "# Creating installation directories..."
         echo "10"
-        debug $DEBUG_DEBUG "Creating installation directories"
         mkdir -p "$INST_MNT/install/services" >> "$LOG_FILE" 2>&1 || error "Failed to create directories!"
         
-        debug $DEBUG_DEBUG "Copying package lists"
-        cp "$pkglists" "$INST_MNT/install/" >> "$LOG_FILE" 2>&1 || error "Failed to copy package list!"
+        echo "# Copying package lists..."
         echo "30"
-        
+        for list in "${pkglists[@]}"; do
+            cp "$list" "$INST_MNT/install/" >> "$LOG_FILE" 2>&1 || error "Failed to copy package list: $(basename "$list")!"
+        done
+
         debug $DEBUG_DEBUG "Copying service files"
         cp -r "$services_dir"/* "$INST_MNT/install/services/" >> "$LOG_FILE" 2>&1 || error "Failed to copy service files!"
         echo "60"
 
         if [[ $FILESYSTEM == "zfs" ]]; then
-            debug $DEBUG_DEBUG "Looking for ZFS OpenRC package"
-            local misc_dir=$(dirname "$pkglists")
-            zfs_openrc=$(find "$misc_dir" -name "zfs-openrc-20241023-1-any.pkg.tar" -type f | head -n 1)
-            
-            if [[ -z "$zfs_openrc" ]]; then
-                error "ZFS OpenRC package not found!"
+            debug $DEBUG_DEBUG "Copying ZFS OpenRC package"
+            if [[ -f "$zfs_openrc" ]]; then
+                cp "$zfs_openrc" "$INST_MNT/install/" >> "$LOG_FILE" 2>&1 || error "Failed to copy ZFS OpenRC package!"
+            else
+                error "ZFS OpenRC package not found! Package path: $zfs_openrc"
             fi
-            
-            debug $DEBUG_DEBUG "Copying ZFS OpenRC package: $(basename "$zfs_openrc")"
-            cp "$zfs_openrc" "$INST_MNT/install/" >> "$LOG_FILE" 2>&1 || error "Failed to copy ZFS OpenRC package!"
         fi
         echo "80"
 
@@ -234,7 +249,22 @@ prepare_chroot() {
 }
 
 run_chroot() {
-    printf "%s\n" "${bold}Running chroot script"
-    artix-chroot $INST_MNT /bin/bash -c "source /install/chroot.env && /install/artix-chrooting"
+    debug $DEBUG_INFO "Starting chroot installation"
+    
+    # Show info message
+    yad --title="Artix Installation" \
+        --text="The final configuration will continue in a terminal window.\nClick OK to proceed." \
+        --width=400 \
+        --button=OK:0 || exit 1
+
+    # Launch xterm directly
+    xterm -geometry 100x30 \
+          -title "Artix Installation Configuration" \
+          -e "artix-chroot $INST_MNT /bin/bash -c 'source /install/chroot.env && /install/artix-chrooting'" || {
+        debug $DEBUG_ERROR "Chroot script failed"
+        error "Error running chroot script!"
+    }
+
+    debug $DEBUG_INFO "Chroot script completed"
     printf "%s\n" "${bold}Chroot script executed successfully!"
 }
