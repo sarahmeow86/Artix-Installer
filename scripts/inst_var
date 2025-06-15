@@ -89,33 +89,29 @@ selectdisk() {
 
     debug $DEBUG_DEBUG "Generating disk list"
     
-    # Get list of physical disks only
+    # Create formatted disk list with multiple columns
     disk_data=""
     while read -r disk; do
-        # Skip if not a physical disk
-        [[ ! -b "$disk" ]] && continue
-        [[ "$disk" =~ "part" ]] && continue
-        
-        # Get disk details safely
-        if size=$(lsblk -dno SIZE "$disk" 2>/dev/null) && \
-           model=$(lsblk -dno MODEL "$disk" 2>/dev/null) && \
-           [[ -n "$size" ]]; then
-            name=$(basename "$disk")
-            disk_data+="FALSE\n$name\n$size\n$model\n"
+        if [[ "$disk" != *"part"* ]]; then
+            device="/dev/disk/by-id/$disk"
+            size=$(lsblk -dno SIZE "$device" 2>/dev/null)
+            model=$(lsblk -dno MODEL "$device" 2>/dev/null)
+            # Clean disk name from any trailing characters
+            disk=$(echo "$disk" | tr -d '\n\r')
+            disk_data+="FALSE\n$disk\n$size\n$model\n"
         fi
-    done < <(find /dev/disk/by-id -type l ! -name '*-part*' 2>/dev/null)
-
-    [[ -z "$disk_data" ]] && error "No valid disks found!"
+    done < <(ls -1 /dev/disk/by-id)
 
     selected=$(echo -e "$disk_data" | yad --list \
         --title="Disk Selection" \
-        --text="<span color='red'><b>WARNING: THIS WILL DELETE EVERYTHING ON THE SELECTED DRIVE!</b></span>\nSelect a disk to install Artix:" \
+        --text="<span color='red'><b>WARNING: THIS WILL DELETE EVERYTHING ON THE SELECTED DRIVE!</b></span>" \
         --width=800 \
         --height=400 \
-        --column="Select:RD" \
+        --column="Select:CHK" \
         --column="Device" \
         --column="Size" \
         --column="Model" \
+        --radiolist \
         --separator="" \
         --button="Cancel:1" \
         --button="Select:0")
@@ -123,23 +119,16 @@ selectdisk() {
     [[ $? -eq 1 ]] && error "Disk selection cancelled"
     [[ -z "$selected" ]] && error "No disk selected!"
 
+    # Clean selected disk name
+    selected=$(echo "$selected" | tr -d '\n\r')
     DISK="/dev/disk/by-id/${selected}"
-    
-    # Verify disk exists and is block device
-    [[ ! -b "$DISK" ]] && error "Selected disk $DISK is not a valid block device!"
-    
     debug $DEBUG_INFO "Disk selected: $DISK"
     
     # Show confirmation with full device details
     size=$(lsblk -dno SIZE "$DISK" 2>/dev/null)
     model=$(lsblk -dno MODEL "$DISK" 2>/dev/null)
-    
-    yad --question \
-        --title="Confirm Disk Selection" \
-        --text="Please confirm disk selection:\n\nDevice: ${selected}\nSize: ${size}\nModel: ${model}\n\nWARNING: All data on this disk will be erased!" \
-        --width=400 \
-        --button="Cancel:1" \
-        --button="Confirm:0"
-
-    [[ $? -eq 1 ]] && exec "$0" # Restart if cancelled
+    yad --info \
+        --title="Disk Selection" \
+        --text="Selected disk:\n\nDevice: ${selected}\nSize: ${size}\nModel: ${model}" \
+        --width=400
 }
