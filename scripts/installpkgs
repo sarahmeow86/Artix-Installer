@@ -7,7 +7,7 @@ installpkgs() {
     local pkglist
     local zfs_openrc
     pkglist="$(get_script_path "pkglist.txt" "misc")"
-    zfs_openrc="$(get_script_path "zfs-openrc-*.pkg.tar.zst" "misc")"
+    zfs_openrc="$(get_script_path "zfs-openrc.pkg.tar.zst" "misc")"
 
     # Start the progress bar
     (
@@ -23,8 +23,9 @@ installpkgs() {
         # Install ZFS packages if ZFS is selected
         if [[ $FILESYSTEM == "zfs" ]]; then
             echo "Installing ZFS packages..."; sleep 1
-            debug $DEBUG_DEBUG "Installing ZFS packages from misc directory"
-            basestrap $INST_MNT zfs-dkms-git zfs-utils-git
+            debug $DEBUG_DEBUG "Installing ZFS packages from yay cache directories"
+            basestrap -U $INST_MNT /home/artix/.cache/yay/zfs-dkms-staging-git/*.pkg.tar.zst >> "$LOG_FILE" 2>&1
+            basestrap -U $INST_MNT /home/artix/.cache/yay/zfs-utils-staging-git/*.pkg.tar.zst >> "$LOG_FILE" 2>&1
             debug $DEBUG_DEBUG "Installing ZFS OpenRC package"
             basestrap -U $INST_MNT "$zfs_openrc" >> "$LOG_FILE" 2>&1 && echo "90"
         fi
