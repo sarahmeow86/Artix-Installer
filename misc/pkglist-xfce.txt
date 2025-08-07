@@ -27,6 +27,8 @@ artix-icons
 artix-qt-presets
 at-spi2-core
 atril
+autoconf
+automake
 avahi
 avahi-openrc
 b43-fwcutter

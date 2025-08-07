@@ -28,6 +28,8 @@ artix-qt-presets
 at-spi2-core
 atkmm
 atril
+autoconf
+automake
 avahi
 avahi-openrc
 ayatana-ido

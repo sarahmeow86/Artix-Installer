@@ -23,6 +23,8 @@ artix-grub-theme
 artix-gtk-presets
 artix-icons
 artix-qt-presets
+autoconf
+automake
 at-spi2-core
 attica
 avahi
