@@ -57,19 +57,34 @@ error() {
 select_desktop_environment() {
     debug $DEBUG_INFO "Starting desktop environment selection"
     
+    # Detect root filesystem
+    ROOT_FS=$(findmnt -n -o FSTYPE /)
+    debug $DEBUG_INFO "Detected root filesystem: $ROOT_FS"
+
     # Create temporary file for dialog output
     temp_choice=$(mktemp)
     debug $DEBUG_DEBUG "Created temporary choice file: $temp_choice"
 
     # Display dialog menu - using saved descriptors
-    dialog --clear --title "Desktop Environment Selection" \
-        --menu "Choose a desktop environment to install:" 15 60 6 \
-        1 "Base (No Desktop Environment)" \
-        2 "Cinnamon" \
-        3 "MATE" \
-        4 "KDE Plasma" \
-        5 "LXQt" \
-        6 "XFCE" 2>"$temp_choice" >&3
+    if [[ "$ROOT_FS" == "zfs" ]]; then
+        debug $DEBUG_INFO "ZFS detected - disabling Plasma option"
+        dialog --clear --title "Desktop Environment Selection" \
+            --menu "Choose a desktop environment to install:\n(Plasma disabled - incompatible with ZFS, it may cause issues like slow shutdowns or worse!)" 15 60 5 \
+            1 "Base (No Desktop Environment)" \
+            2 "Cinnamon" \
+            3 "MATE" \
+            5 "LXQt" \
+            6 "XFCE" 2>"$temp_choice" >&3
+    else
+        dialog --clear --title "Desktop Environment Selection" \
+            --menu "Choose a desktop environment to install:" 15 60 6 \
+            1 "Base (No Desktop Environment)" \
+            2 "Cinnamon" \
+            3 "MATE" \
+            4 "KDE Plasma" \
+            5 "LXQt" \
+            6 "XFCE" 2>"$temp_choice" >&3
+    fi
 
     # Read user's choice
     DE_CHOICE=$(<"$temp_choice")
@@ -90,6 +105,11 @@ select_desktop_environment() {
             DE="mate"
             ;;
         4) 
+            if [[ "$ROOT_FS" == "zfs" ]]; then
+                debug $DEBUG_ERROR "KDE Plasma not supported with ZFS"
+                restore_descriptors
+                error "KDE Plasma is not compatible with ZFS filesystem!"
+            fi
             PKGLIST="pkglist-plasma.txt"
             DE="plasma"
             ;;

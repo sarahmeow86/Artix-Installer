@@ -10,7 +10,7 @@ installzfs() {
 
     # Get path for ZFS OpenRC package
     local zfs_openrc
-    zfs_openrc="$(get_script_path "zfs-openrc.pkg.tar.zst" "misc")"
+    zfs_openrc="$(get_script_path "init.d" "misc")"
 
     # Start the progress bar
     (
@@ -18,8 +18,8 @@ installzfs() {
         echo "Installing ZFS packages..."; sleep 1
         pacman -Sy --noconfirm --needed yay autoconf automake fakeroot && echo "20"
         su artix -c "yay -S --noconfirm --needed zfs-dkms-staging-git zfs-utils-staging-git" && echo "30"
-        echo "Installing ZFS OpenRC package..."; sleep 1
-        pacman -U --noconfirm "$zfs_openrc" && echo "70"
+        echo "Copying init.d scripts for ZFS..."; sleep 1
+        cp -r "$zfs_openrc" /etc/ >> /var/log/artix-installer.log 2>&1 && echo "70"
         echo "Loading ZFS kernel module..."; sleep 1
         modprobe zfs && echo "90"
         zgenhostid -f && echo "100"
