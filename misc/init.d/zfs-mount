@@ -1,5 +1,0 @@
-#!/usr/bin/openrc-run
-
-start() {
-/usr/bin/zfs mount -a
-}
