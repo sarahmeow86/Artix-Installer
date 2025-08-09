@@ -134,26 +134,22 @@ prepare_chroot() {
     # Get paths for required files
     local pkglists
     local services_dir
-    local zfs_openrc
     local chroot_script
     
     # Initialize paths with proper error checking
     pkglists=$(get_script_path "pkglist-*.txt" "misc") || error "Failed to find package list"
     services_dir=$(get_script_path "services" "misc") || error "Failed to find services directory"
     chroot_script=$(get_script_path "artix-chrooting" "scripts") || error "Failed to find chroot script"
-    zfs_openrc=$(get_script_path "zfs-openrc-20241023-1-any.pkg.tar.zst" "misc") || error "Failed to find ZFS OpenRC package"
 
     # Verify paths exist before proceeding
     debug $DEBUG_DEBUG "Verifying paths..."
     debug $DEBUG_DEBUG "Package lists: $pkglists"
     debug $DEBUG_DEBUG "Services dir: $services_dir"
     debug $DEBUG_DEBUG "Chroot script: $chroot_script"
-    debug $DEBUG_DEBUG "ZFS OpenRC package: $zfs_openrc"
 
     [ ! -f "$pkglists" ] && error "Package list not found at: $pkglists"
     [ ! -f "$chroot_script" ] && error "Chroot script not found at: $chroot_script"
     [ ! -d "$services_dir" ] && error "Services directory not found at: $services_dir"
-    [ ! -f "$zfs_openrc" ] && error "ZFS OpenRC package not found at: $zfs_openrc"
 
     # Start the progress bar
     (
@@ -173,7 +169,7 @@ prepare_chroot() {
         cp "$chroot_script" "$INST_MNT/install/artix-chrooting" >> "$LOG_FILE" 2>&1 || error "Failed to copy chroot script!"
         chmod +x "$INST_MNT/install/artix-chrooting" >> "$LOG_FILE" 2>&1 || error "Failed to set execute permission!"
         echo "80"
-        
+
         debug $DEBUG_DEBUG "Creating environment file"
         echo "TIMEZONE=$TIMEZONE" > "$INST_MNT/install/chroot.env" 2>> "$LOG_FILE" || error "Failed to create environment file!"
         echo "100"

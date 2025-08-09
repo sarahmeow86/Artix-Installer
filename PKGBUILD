@@ -1,7 +1,7 @@
 # Maintainer: Sarah <saretta1986@proton.me>
 
 pkgname=artix-installer
-pkgver=1.0.0
+pkgver=1.1.0
 pkgrel=1
 pkgdesc="Artix Linux Installation Script"
 arch=('any')
